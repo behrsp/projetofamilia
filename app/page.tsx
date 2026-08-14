@@ -236,6 +236,19 @@ export default function Home() {
   };
 
   // Student Admin Actions
+  const handleAddStudent = async (data: any) => {
+    const res = await fetch('/api/students', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Erro ao cadastrar aluno.');
+    }
+    await fetchData();
+  };
+
   const handleUpdateStudent = async (id: string, data: Partial<User>) => {
     const res = await fetch(`/api/students/${id}`, {
       method: 'PUT',
@@ -384,6 +397,7 @@ export default function Home() {
         {activeTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'PROFESSOR') && (
           <AdminDashboard
             students={students}
+            onAddStudent={handleAddStudent}
             onUpdateStudent={handleUpdateStudent}
             onDeleteStudent={handleDeleteStudent}
             onOpenCordGuide={() => setIsCordModalOpen(true)}

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getAuthSession } from '@/lib/auth';
+import bcrypt from 'bcryptjs';
+import { getAuthSession, sanitizePhone } from '@/lib/auth';
 import { pool, initDb } from '@/lib/db';
 
-// GET all students (Restricted or for cord counting dashboard)
+// GET all students
 export async function GET() {
   try {
     await initDb();
@@ -21,7 +22,52 @@ export async function GET() {
   }
 }
 
-// PUT: Self-update profile (Student updates their avatar, name, nickname, birthdate, corda)
+// POST: Admin and Professor register new student directly
+export async function POST(req: Request) {
+  try {
+    await initDb();
+    const session = await getAuthSession();
+    if (!session || (session.role !== 'ADMIN' && session.role !== 'PROFESSOR')) {
+      return NextResponse.json({ error: 'Somente professores e administradores podem cadastrar alunos diretamente.' }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const { name, nickname, phone, password, birthdate, corda, role } = body;
+
+    if (!name || !nickname || !phone || !birthdate) {
+      return NextResponse.json({ error: 'Nome, apelido, telefone e data de nascimento são obrigatórios.' }, { status: 400 });
+    }
+
+    const cleanPhone = sanitizePhone(phone);
+    if (cleanPhone.length < 8) {
+      return NextResponse.json({ error: 'Número de telefone inválido.' }, { status: 400 });
+    }
+
+    // Check existing phone
+    const existing = await pool.query('SELECT id FROM users WHERE phone = $1', [cleanPhone]);
+    if (existing.rows.length > 0) {
+      return NextResponse.json({ error: 'Este número de telefone já está cadastrado.' }, { status: 400 });
+    }
+
+    const initialPassword = password || '123456';
+    const passwordHash = await bcrypt.hash(initialPassword, 10);
+    const selectedCorda = corda || 'Crua';
+    const selectedRole = role || 'ALUNO';
+
+    const result = await pool.query(
+      `INSERT INTO users (name, nickname, phone, password_hash, birthdate, corda, role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, name, nickname, phone, birthdate, corda, role, avatar_url, created_at`,
+      [name, nickname, cleanPhone, passwordHash, birthdate, selectedCorda, selectedRole]
+    );
+
+    return NextResponse.json({ success: true, user: result.rows[0] });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// PUT: Self-update profile
 export async function PUT(req: Request) {
   try {
     await initDb();
