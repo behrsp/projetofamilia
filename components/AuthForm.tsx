@@ -56,9 +56,9 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onLoginSuccess }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-950/40 via-slate-950 to-slate-950">
-      
+
       <div className="relative w-full max-w-lg bg-slate-900/90 border border-emerald-500/30 rounded-3xl shadow-2xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
-        
+
         {/* Logo Branding */}
         <div className="flex flex-col items-center text-center space-y-3">
           <div className="relative h-20 w-32 rounded-2xl overflow-hidden p-1 border border-emerald-500/40 bg-slate-900 shadow-xl shadow-emerald-500/20 flex items-center justify-center">
@@ -86,11 +86,10 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onLoginSuccess }) => {
               setIsRegisterMode(false);
               setError('');
             }}
-            className={`py-2.5 rounded-xl text-xs font-extrabold transition-all ${
-              !isRegisterMode
+            className={`py-2.5 rounded-xl text-xs font-extrabold transition-all ${!isRegisterMode
                 ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             Entrar (Login)
           </button>
@@ -100,11 +99,10 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onLoginSuccess }) => {
               setIsRegisterMode(true);
               setError('');
             }}
-            className={`py-2.5 rounded-xl text-xs font-extrabold transition-all ${
-              isRegisterMode
+            className={`py-2.5 rounded-xl text-xs font-extrabold transition-all ${isRegisterMode
                 ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             Cadastrar-se
           </button>
