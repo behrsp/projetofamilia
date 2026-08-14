@@ -73,7 +73,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onLoginSuccess }) => {
               ABADÁ CAPOEIRA
             </h1>
             <p className="text-xs text-emerald-400/80 font-medium tracking-widest uppercase mt-0.5">
-              Portal Oficial do Grupo
+              Projeto Família na Capoeira
             </p>
           </div>
         </div>
