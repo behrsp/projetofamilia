@@ -54,13 +54,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleFillAdminQuickLogin = () => {
-    setIsRegisterMode(false);
-    setPhone('41984842941');
-    setPassword('235689');
-    setError('');
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-950/40 via-slate-950 to-slate-950">
       
@@ -256,19 +249,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onLoginSuccess }) => {
             <span>{loading ? 'Carregando...' : isRegisterMode ? 'Cadastrar Aluno' : 'Entrar no Sistema'}</span>
           </button>
         </form>
-
-        {/* Quick Admin Shortcut */}
-        {!isRegisterMode && (
-          <div className="pt-4 border-t border-slate-800 text-center">
-            <button
-              onClick={handleFillAdminQuickLogin}
-              className="text-xs text-amber-400 hover:underline font-bold flex items-center justify-center space-x-1 mx-auto"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Preencher Login de Administrador (41984842941)</span>
-            </button>
-          </div>
-        )}
 
       </div>
     </div>
