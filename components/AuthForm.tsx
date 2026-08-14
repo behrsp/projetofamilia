@@ -68,12 +68,11 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onLoginSuccess }) => {
         
         {/* Logo Branding */}
         <div className="flex flex-col items-center text-center space-y-3">
-          <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-emerald-500 shadow-xl shadow-emerald-500/20">
-            <Image
+          <div className="relative h-20 w-32 rounded-2xl overflow-hidden p-1 border border-emerald-500/40 bg-slate-900 shadow-xl shadow-emerald-500/20 flex items-center justify-center">
+            <img
               src="/abada-logo.png"
               alt="ABADÁ Capoeira"
-              fill
-              className="object-cover"
+              className="w-full h-full object-contain"
             />
           </div>
           <div>

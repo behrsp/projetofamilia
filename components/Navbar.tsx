@@ -61,12 +61,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center space-x-3 cursor-pointer group"
             onClick={() => setActiveTab('musicas')}
           >
-            <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 border-emerald-500/50 group-hover:border-emerald-400 transition-all shadow-md shadow-emerald-500/20">
-              <Image 
+            <div className="relative h-10 sm:h-12 w-14 sm:w-16 rounded-2xl overflow-hidden p-1 border border-emerald-500/40 bg-slate-900 group-hover:border-emerald-400 transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center">
+              <img 
                 src="/abada-logo.png" 
                 alt="ABADÁ Capoeira" 
-                fill 
-                className="object-cover group-hover:scale-110 transition-transform duration-300"
+                className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
               />
             </div>
             <div>
