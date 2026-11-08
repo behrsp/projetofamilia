@@ -33,9 +33,15 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { name, nickname, phone, password, birthdate, corda, role } = body;
+    const selectedRole = role || 'ALUNO';
+    const isRecepcao = selectedRole === 'RECEPCAO';
 
-    if (!name || !nickname || !phone || !birthdate) {
-      return NextResponse.json({ error: 'Nome, apelido, telefone e data de nascimento são obrigatórios.' }, { status: 400 });
+    if (!name || !phone || (!isRecepcao && (!nickname || !birthdate))) {
+      return NextResponse.json({ 
+        error: isRecepcao 
+          ? 'Nome e telefone são obrigatórios para a Recepção.' 
+          : 'Nome, apelido, telefone e data de nascimento são obrigatórios.' 
+      }, { status: 400 });
     }
 
     const cleanPhone = sanitizePhone(phone);
@@ -51,14 +57,15 @@ export async function POST(req: Request) {
 
     const initialPassword = password || '123456';
     const passwordHash = await bcrypt.hash(initialPassword, 10);
-    const selectedCorda = corda || 'Crua';
-    const selectedRole = role || 'ALUNO';
+    const finalNickname = isRecepcao ? (nickname?.trim() || 'Recepção') : nickname.trim();
+    const finalBirthdate = isRecepcao ? '' : birthdate.trim();
+    const selectedCorda = isRecepcao ? 'Sem Corda' : (corda || 'Crua');
 
     const result = await pool.query(
       `INSERT INTO users (name, nickname, phone, password_hash, birthdate, corda, role)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, name, nickname, phone, birthdate, corda, role, avatar_url, created_at`,
-      [name, nickname, cleanPhone, passwordHash, birthdate, selectedCorda, selectedRole]
+      [name.trim(), finalNickname, cleanPhone, passwordHash, finalBirthdate, selectedCorda, selectedRole]
     );
 
     return NextResponse.json({ success: true, user: result.rows[0] });

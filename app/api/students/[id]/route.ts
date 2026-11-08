@@ -44,11 +44,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       passwordHash = await bcrypt.hash(password.trim(), 10);
     }
 
-    const finalName = name !== undefined && name.trim() !== '' ? name.trim() : currentUser.name;
-    const finalNickname = nickname !== undefined && nickname.trim() !== '' ? nickname.trim() : currentUser.nickname;
-    const finalBirthdate = birthdate !== undefined && birthdate.trim() !== '' ? birthdate.trim() : currentUser.birthdate;
-    const finalCorda = corda !== undefined && corda.trim() !== '' ? corda.trim() : currentUser.corda;
     const finalRole = role !== undefined && role.trim() !== '' ? role.trim() : currentUser.role;
+    const isRecepcao = finalRole === 'RECEPCAO';
+    const finalName = name !== undefined && name.trim() !== '' ? name.trim() : currentUser.name;
+    const finalNickname = isRecepcao
+      ? (nickname !== undefined && nickname.trim() !== '' ? nickname.trim() : 'Recepção')
+      : (nickname !== undefined && nickname.trim() !== '' ? nickname.trim() : currentUser.nickname);
+    const finalBirthdate = isRecepcao
+      ? ''
+      : (birthdate !== undefined && birthdate.trim() !== '' ? birthdate.trim() : currentUser.birthdate);
+    const finalCorda = isRecepcao
+      ? 'Sem Corda'
+      : (corda !== undefined && corda.trim() !== '' ? corda.trim() : currentUser.corda);
     const finalAvatarUrl = avatar_url !== undefined ? avatar_url : currentUser.avatar_url;
 
     const res = await pool.query(

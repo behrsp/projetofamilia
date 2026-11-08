@@ -72,10 +72,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Compute student count by cord
+  // Compute student count by cord (excluding Recepção)
   const cordCounts: Record<string, number> = {};
   students.forEach((s) => {
-    cordCounts[s.corda] = (cordCounts[s.corda] || 0) + 1;
+    if (s.role !== 'RECEPCAO') {
+      cordCounts[s.corda] = (cordCounts[s.corda] || 0) + 1;
+    }
   });
 
   const filteredStudents = students.filter((s) => {
@@ -116,8 +118,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.preventDefault();
     if (!editingStudent) return;
 
-    if (!editName.trim() || !editNickname.trim() || !editPhone.trim() || !editBirthdate.trim()) {
-      setEditError('Nome, apelido, telefone e data de nascimento são obrigatórios.');
+    const isRecepcao = editRole === 'RECEPCAO';
+    if (!editName.trim() || !editPhone.trim() || (!isRecepcao && (!editNickname.trim() || !editBirthdate.trim()))) {
+      setEditError(
+        isRecepcao
+          ? 'Nome e telefone são obrigatórios para a Recepção.'
+          : 'Nome, apelido, telefone e data de nascimento são obrigatórios.'
+      );
       return;
     }
 
@@ -127,10 +134,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       await onUpdateStudent(editingStudent.id, {
         name: editName.trim(),
-        nickname: editNickname.trim(),
+        nickname: isRecepcao ? (editNickname.trim() || 'Recepção') : editNickname.trim(),
         phone: editPhone.trim(),
-        birthdate: editBirthdate.trim(),
-        corda: editCorda,
+        birthdate: isRecepcao ? '' : editBirthdate.trim(),
+        corda: isRecepcao ? 'Sem Corda' : editCorda,
         role: editRole,
         password: editPassword.trim() ? editPassword.trim() : undefined,
         avatar_url: editAvatarUrl,
@@ -138,7 +145,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       setEditingStudent(null);
     } catch (err: any) {
-      setEditError(err.message || 'Erro ao atualizar cadastro do aluno.');
+      setEditError(err.message || 'Erro ao atualizar cadastro.');
     } finally {
       setLoading(false);
     }
@@ -146,8 +153,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newNickname.trim() || !newPhone.trim() || !newBirthdate.trim()) {
-      setError('Por favor, preencha nome, apelido, telefone e data de nascimento.');
+    const isRecepcao = newRole === 'RECEPCAO';
+    if (!newName.trim() || !newPhone.trim() || (!isRecepcao && (!newNickname.trim() || !newBirthdate.trim()))) {
+      setError(
+        isRecepcao
+          ? 'Por favor, preencha o nome e o telefone da Recepção.'
+          : 'Por favor, preencha nome, apelido, telefone e data de nascimento.'
+      );
       return;
     }
 
@@ -156,11 +168,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setError('');
       await onAddStudent({
         name: newName.trim(),
-        nickname: newNickname.trim(),
+        nickname: isRecepcao ? (newNickname.trim() || 'Recepção') : newNickname.trim(),
         phone: newPhone.trim(),
         password: newPassword || '123456',
-        birthdate: newBirthdate.trim(),
-        corda: newCorda,
+        birthdate: isRecepcao ? '' : newBirthdate.trim(),
+        corda: isRecepcao ? 'Sem Corda' : newCorda,
         role: newRole,
       });
 
@@ -285,8 +297,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           ) : (
             filteredStudents.map((st) => {
-              const age = calculateAge(st.birthdate);
-              const isToday = isBirthdayToday(st.birthdate);
+              const isRec = st.role === 'RECEPCAO';
+              const age = isRec ? null : calculateAge(st.birthdate);
+              const isToday = isRec ? false : isBirthdayToday(st.birthdate);
               const cordInfo = getCordInfo(st.corda);
 
               return (
@@ -299,7 +312,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="flex items-center space-x-3 min-w-0">
                       <div 
                         className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-emerald-300 text-xs overflow-hidden shrink-0 shadow-sm"
-                        style={{ border: `2px solid ${cordInfo.color}` }}
+                        style={{ border: `2px solid ${isRec ? '#38bdf8' : cordInfo.color}` }}
                       >
                         {st.avatar_url ? (
                           <img src={st.avatar_url} alt={st.nickname} className="w-full h-full object-cover" />
@@ -313,22 +326,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <h4 className="font-extrabold text-white text-sm truncate">
                           {st.name}
                         </h4>
-                        <p className="text-amber-400 font-semibold text-xs truncate">
-                          &quot;{st.nickname}&quot;
+                        <p className={`font-semibold text-xs truncate ${isRec ? 'text-sky-400' : 'text-amber-400'}`}>
+                          {isRec ? 'Equipe de Recepção' : `"${st.nickname}"`}
                         </p>
                       </div>
                     </div>
 
-                    <span 
-                      className="px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm shrink-0"
-                      style={{
-                        backgroundColor: cordInfo.color,
-                        color: cordInfo.textColor,
-                        border: '1px solid rgba(0,0,0,0.15)',
-                      }}
-                    >
-                      {st.corda}
-                    </span>
+                    {isRec ? (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30 shrink-0">
+                        Recepção (Sem corda)
+                      </span>
+                    ) : (
+                      <span 
+                        className="px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm shrink-0"
+                        style={{
+                          backgroundColor: cordInfo.color,
+                          color: cordInfo.textColor,
+                          border: '1px solid rgba(0,0,0,0.15)',
+                        }}
+                      >
+                        {st.corda}
+                      </span>
+                    )}
                   </div>
 
                   {/* Info Chips */}
@@ -341,8 +360,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="flex items-center space-x-1.5 text-slate-300 truncate">
                       <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       <span className="text-[11px] truncate">
-                        {formatBirthdateBR(st.birthdate)}
-                        {age !== null ? ` (${age}a)` : ''}
+                        {isRec
+                          ? 'Não aplicável'
+                          : `${formatBirthdateBR(st.birthdate)}${age !== null ? ` (${age}a)` : ''}`}
                       </span>
                     </div>
                   </div>
@@ -417,8 +437,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               ) : (
                 filteredStudents.map((st) => {
-                  const age = calculateAge(st.birthdate);
-                  const isToday = isBirthdayToday(st.birthdate);
+                  const isRec = st.role === 'RECEPCAO';
+                  const age = isRec ? null : calculateAge(st.birthdate);
+                  const isToday = isRec ? false : isBirthdayToday(st.birthdate);
                   const cordInfo = getCordInfo(st.corda);
 
                   return (
@@ -438,8 +459,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <span className="font-extrabold text-white text-sm block">
                               {st.name}
                             </span>
-                            <span className="text-amber-400 font-semibold">
-                              &quot;{st.nickname}&quot;
+                            <span className={`font-semibold ${isRec ? 'text-sky-400' : 'text-amber-400'}`}>
+                              {isRec ? 'Equipe de Recepção' : `"${st.nickname}"`}
                             </span>
                           </div>
                         </div>
@@ -455,37 +476,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                       {/* Birthdate & Age */}
                       <td className="px-6 py-4">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center space-x-1.5 text-slate-300 font-medium">
-                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{formatBirthdateBR(st.birthdate)}</span>
+                        {isRec ? (
+                          <span className="text-slate-500 italic text-xs">Não aplicável</span>
+                        ) : (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center space-x-1.5 text-slate-300 font-medium">
+                              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                              <span>{formatBirthdateBR(st.birthdate)}</span>
+                            </div>
+                            {age !== null && (
+                              <span className="text-[10px] text-slate-400 block pl-5">
+                                {age} {age === 1 ? 'ano' : 'anos'}
+                              </span>
+                            )}
+                            {isToday && (
+                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 mt-1 rounded-full text-[10px] font-extrabold bg-pink-500/20 text-pink-300 border border-pink-500/30 animate-pulse">
+                                <Cake className="w-3 h-3 text-pink-400" />
+                                <span>Aniversário Hoje!</span>
+                              </span>
+                            )}
                           </div>
-                          {age !== null && (
-                            <span className="text-[10px] text-slate-400 block pl-5">
-                              {age} {age === 1 ? 'ano' : 'anos'}
-                            </span>
-                          )}
-                          {isToday && (
-                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 mt-1 rounded-full text-[10px] font-extrabold bg-pink-500/20 text-pink-300 border border-pink-500/30 animate-pulse">
-                              <Cake className="w-3 h-3 text-pink-400" />
-                              <span>Aniversário Hoje!</span>
-                            </span>
-                          )}
-                        </div>
+                        )}
                       </td>
 
                       {/* Corda Badge */}
                       <td className="px-6 py-4">
-                        <span 
-                          className="px-3 py-1 rounded-full font-bold shadow-sm inline-block text-xs"
-                          style={{
-                            backgroundColor: cordInfo.color,
-                            color: cordInfo.textColor,
-                            border: '1px solid rgba(0,0,0,0.15)'
-                          }}
-                        >
-                          {st.corda}
-                        </span>
+                        {isRec ? (
+                          <span className="px-3 py-1 rounded-full font-bold text-xs bg-slate-800 text-slate-400 border border-slate-700 inline-block">
+                            Sem corda (Recepção)
+                          </span>
+                        ) : (
+                          <span 
+                            className="px-3 py-1 rounded-full font-bold shadow-sm inline-block text-xs"
+                            style={{
+                              backgroundColor: cordInfo.color,
+                              color: cordInfo.textColor,
+                              border: '1px solid rgba(0,0,0,0.15)'
+                            }}
+                          >
+                            {st.corda}
+                          </span>
+                        )}
                       </td>
 
                       {/* Role */}
@@ -566,31 +597,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               )}
 
               <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Função no Sistema *</label>
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value as UserRole)}
+                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                >
+                  <option value="ALUNO">ALUNO (Acesso comum)</option>
+                  <option value="RECEPCAO">RECEPÇÃO (Apenas Chamadas, PDF e Excel - sem corda/aniversário)</option>
+                  <option value="PROFESSOR">PROFESSOR (Gestão de alunos e chamadas)</option>
+                  <option value="ADMIN">ADMINISTRADOR (Acesso total)</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Nome Completo *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex: João da Silva"
+                  placeholder={newRole === 'RECEPCAO' ? 'Ex: Maria (Portaria)' : 'Ex: João da Silva'}
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Apelido na Capoeira *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Sorriso"
-                  value={newNickname}
-                  onChange={(e) => setNewNickname(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
-                />
-              </div>
+              {newRole !== 'RECEPCAO' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Apelido na Capoeira *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Sorriso"
+                    value={newNickname}
+                    onChange={(e) => setNewNickname(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                  />
+                </div>
+              )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Telefone (Login do Aluno) *</label>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                  Telefone / WhatsApp (Login) *
+                </label>
                 <input
                   type="text"
                   required
@@ -612,45 +661,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Data de Nascimento *</label>
-                <input
-                  type="date"
-                  required
-                  value={newBirthdate}
-                  onChange={(e) => setNewBirthdate(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
-                />
-              </div>
+              {newRole !== 'RECEPCAO' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Data de Nascimento *</label>
+                    <input
+                      type="date"
+                      required
+                      value={newBirthdate}
+                      onChange={(e) => setNewBirthdate(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Graduação (Corda ABADÁ)</label>
-                <select
-                  value={newCorda}
-                  onChange={(e) => setNewCorda(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
-                >
-                  {ABADA_CORDAS.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name} ({c.level})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Função</label>
-                <select
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value as UserRole)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
-                >
-                  <option value="ALUNO">ALUNO (Acesso comum)</option>
-                  <option value="RECEPCAO">RECEPÇÃO (Visualiza chamadas, imprime, PDF e Excel)</option>
-                  <option value="PROFESSOR">PROFESSOR (Gestão de alunos e chamadas)</option>
-                  <option value="ADMIN">ADMINISTRADOR (Acesso total)</option>
-                </select>
-              </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Graduação (Corda ABADÁ)</label>
+                    <select
+                      value={newCorda}
+                      onChange={(e) => setNewCorda(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                    >
+                      {ABADA_CORDAS.map((c) => (
+                        <option key={c.name} value={c.name}>
+                          {c.name} ({c.level})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
 
               <div className="pt-3 border-t border-slate-800 flex justify-end space-x-3">
                 <button
@@ -742,6 +781,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
+              {/* Função no Sistema */}
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                  Função no Sistema
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                >
+                  <option value="ALUNO">ALUNO (Acesso comum)</option>
+                  <option value="RECEPCAO">RECEPÇÃO (Apenas Chamadas, PDF e Excel - sem corda/aniversário)</option>
+                  <option value="PROFESSOR">PROFESSOR (Gestão de alunos e pedidos)</option>
+                  <option value="ADMIN">ADMINISTRADOR (Acesso total)</option>
+                </select>
+              </div>
+
               {/* Nome Completo */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
@@ -756,46 +812,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
               </div>
 
-              {/* Apelido na Capoeira */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
-                  Apelido na Capoeira *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editNickname}
-                  onChange={(e) => setEditNickname(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
-                />
-              </div>
+              {editRole !== 'RECEPCAO' && (
+                <>
+                  {/* Apelido na Capoeira */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                      Apelido na Capoeira *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editNickname}
+                      onChange={(e) => setEditNickname(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                    />
+                  </div>
 
-              {/* Data de Nascimento - Critical Requirement */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-300 uppercase">
-                    Data de Nascimento *
-                  </label>
-                  {editBirthdate && (
-                    <span className="text-[11px] text-emerald-400 font-semibold">
-                      Exibição: {formatBirthdateBR(editBirthdate)}
-                    </span>
-                  )}
-                </div>
-                <div className="relative">
-                  <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
-                  <input
-                    type="date"
-                    required
-                    value={editBirthdate}
-                    onChange={(e) => setEditBirthdate(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  * Caso o aluno tenha preenchido a data errada no cadastro, corrija aqui.
-                </p>
-              </div>
+                  {/* Data de Nascimento - Critical Requirement */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-300 uppercase">
+                        Data de Nascimento *
+                      </label>
+                      {editBirthdate && (
+                        <span className="text-[11px] text-emerald-400 font-semibold">
+                          Exibição: {formatBirthdateBR(editBirthdate)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+                      <input
+                        type="date"
+                        required
+                        value={editBirthdate}
+                        onChange={(e) => setEditBirthdate(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      * Caso o aluno tenha preenchido a data errada no cadastro, corrija aqui.
+                    </p>
+                  </div>
+                </>
+              )}
 
               {/* Telefone / WhatsApp (Login) */}
               <div>
@@ -815,51 +875,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Graduação (Corda ABADÁ) */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-300 uppercase">
-                    Graduação (Corda ABADÁ)
-                  </label>
-                  <span 
-                    className="px-2.5 py-0.5 rounded-full text-[10px] font-bold"
-                    style={{
-                      backgroundColor: currentEditCord.color,
-                      color: currentEditCord.textColor,
-                    }}
+              {/* Graduação (Corda ABADÁ) - Only for non-Recepção */}
+              {editRole !== 'RECEPCAO' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-300 uppercase">
+                      Graduação (Corda ABADÁ)
+                    </label>
+                    <span 
+                      className="px-2.5 py-0.5 rounded-full text-[10px] font-bold"
+                      style={{
+                        backgroundColor: currentEditCord.color,
+                        color: currentEditCord.textColor,
+                      }}
+                    >
+                      {currentEditCord.name}
+                    </span>
+                  </div>
+                  <select
+                    value={editCorda}
+                    onChange={(e) => setEditCorda(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
                   >
-                    {currentEditCord.name}
-                  </span>
+                    {ABADA_CORDAS.map((c) => (
+                      <option key={c.name} value={c.name}>
+                        {c.name} ({c.level})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <select
-                  value={editCorda}
-                  onChange={(e) => setEditCorda(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
-                >
-                  {ABADA_CORDAS.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name} ({c.level})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Função no Sistema */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
-                  Função no Sistema
-                </label>
-                <select
-                  value={editRole}
-                  onChange={(e) => setEditRole(e.target.value as UserRole)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
-                >
-                  <option value="ALUNO">ALUNO (Acesso comum)</option>
-                  <option value="RECEPCAO">RECEPÇÃO (Visualiza chamadas, imprime, PDF e Excel)</option>
-                  <option value="PROFESSOR">PROFESSOR (Gestão de alunos e pedidos)</option>
-                  <option value="ADMIN">ADMINISTRADOR (Acesso total)</option>
-                </select>
-              </div>
+              )}
 
               {/* Redefinição de Senha (Opcional) */}
               <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">

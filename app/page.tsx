@@ -72,6 +72,9 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
+        if (data.user?.role === 'RECEPCAO') {
+          setActiveTab('presenca');
+        }
       } else {
         setUser(null);
       }
@@ -329,13 +332,14 @@ export default function Home() {
 
   const thisMonthBirthdays = useMemo(() => {
     return students.filter((s) => {
+      if (s.role === 'RECEPCAO') return false;
       const parsed = parseBirthdate(s.birthdate);
       return parsed && parsed.month === currentMonthNum;
     });
   }, [students, currentMonthNum]);
 
   const todayBirthdays = useMemo(() => {
-    return students.filter((s) => isBirthdayToday(s.birthdate, now));
+    return students.filter((s) => s.role !== 'RECEPCAO' && isBirthdayToday(s.birthdate, now));
   }, [students, now]);
 
   if (loading) {
@@ -348,25 +352,38 @@ export default function Home() {
   }
 
   if (!user) {
-    return <AuthForm onLoginSuccess={(u) => setUser(u)} />;
+    return (
+      <AuthForm
+        onLoginSuccess={(u) => {
+          setUser(u);
+          if (u.role === 'RECEPCAO') {
+            setActiveTab('presenca');
+          }
+        }}
+      />
+    );
   }
 
   const isStaff = user.role === 'ADMIN' || user.role === 'PROFESSOR';
-  const canViewPresenca = isStaff || user.role === 'RECEPCAO';
+  const isRecepcao = user.role === 'RECEPCAO';
+  const canViewPresenca = isStaff || isRecepcao;
+  const effectiveTab = isRecepcao ? 'presenca' : activeTab;
 
-  // Calculate cord counts for modal
+  // Calculate cord counts for modal (excluding Recepção)
   const studentCordCounts: Record<string, number> = {};
   students.forEach((s) => {
-    studentCordCounts[s.corda] = (studentCordCounts[s.corda] || 0) + 1;
+    if (s.role !== 'RECEPCAO') {
+      studentCordCounts[s.corda] = (studentCordCounts[s.corda] || 0) + 1;
+    }
   });
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 pb-24 lg:pb-10 overflow-x-hidden w-full max-w-full">
+    <div className={`min-h-screen flex flex-col bg-slate-950 text-slate-100 ${isRecepcao ? 'pb-10' : 'pb-24 lg:pb-10'} overflow-x-hidden w-full max-w-full`}>
       
       {/* Navigation Bar */}
       <Navbar
         user={user}
-        activeTab={activeTab}
+        activeTab={effectiveTab}
         setActiveTab={setActiveTab}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         onOpenCordGuide={() => setIsCordModalOpen(true)}
@@ -394,8 +411,8 @@ export default function Home() {
           />
         )}
 
-        {/* Quick Birthday Banner when on other tabs */}
-        {activeTab !== 'aniversarios' && activeTab !== 'presenca' && activeTab !== 'dashboard' && (
+        {/* Quick Birthday Banner when on other tabs (Hidden for Recepção) */}
+        {!isRecepcao && effectiveTab !== 'aniversarios' && effectiveTab !== 'presenca' && effectiveTab !== 'dashboard' && (
           <div 
             onClick={() => setActiveTab('aniversarios')}
             className="cursor-pointer group rounded-2xl p-3.5 sm:p-4 bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 border border-emerald-500/30 hover:border-emerald-400/60 shadow-xl transition-all duration-300 flex items-center justify-between gap-3"
@@ -431,7 +448,7 @@ export default function Home() {
         )}
 
         {/* Tab: Presença & Frequência (Admins, Professores e Recepção) */}
-        {activeTab === 'presenca' && canViewPresenca && (
+        {effectiveTab === 'presenca' && canViewPresenca && (
           <AttendanceDashboard
             students={students}
             userRole={user.role}
@@ -449,16 +466,16 @@ export default function Home() {
           />
         )}
 
-        {/* Tab: Aniversariantes do Mês (Liberado para todos os usuários) */}
-        {activeTab === 'aniversarios' && (
+        {/* Tab: Aniversariantes do Mês (Liberado para alunos, professores e admins) */}
+        {!isRecepcao && effectiveTab === 'aniversarios' && (
           <BirthdaysCard
-            students={students}
+            students={students.filter((s) => s.role !== 'RECEPCAO')}
             isStandalone={true}
           />
         )}
 
         {/* Tab: Músicas */}
-        {activeTab === 'musicas' && (
+        {!isRecepcao && effectiveTab === 'musicas' && (
           <SongViewer
             songs={songs}
             user={user}
@@ -475,7 +492,7 @@ export default function Home() {
         )}
 
         {/* Tab: Instrumentos */}
-        {activeTab === 'instrumentos' && (
+        {!isRecepcao && effectiveTab === 'instrumentos' && (
           <InstrumentPlayer
             instruments={instruments}
             user={user}
@@ -485,7 +502,7 @@ export default function Home() {
         )}
 
         {/* Tab: Eventos */}
-        {activeTab === 'eventos' && (
+        {!isRecepcao && effectiveTab === 'eventos' && (
           <EventCard
             events={events}
             user={user}
@@ -496,7 +513,7 @@ export default function Home() {
         )}
 
         {/* Tab: Fotos */}
-        {activeTab === 'fotos' && (
+        {!isRecepcao && effectiveTab === 'fotos' && (
           <PhotoGallery
             photos={photos}
             user={user}
@@ -506,7 +523,7 @@ export default function Home() {
         )}
 
         {/* Tab: Pedidos */}
-        {activeTab === 'pedidos' && (
+        {!isRecepcao && effectiveTab === 'pedidos' && (
           <RequestsManager
             requests={requests}
             user={user}
@@ -516,7 +533,7 @@ export default function Home() {
         )}
 
         {/* Tab: Graduação */}
-        {activeTab === 'graduacao' && (
+        {!isRecepcao && effectiveTab === 'graduacao' && (
           <div className="space-y-6">
             <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 text-center space-y-4">
               <h2 className="text-2xl font-extrabold text-white">Sistema de Graduações ABADÁ Capoeira</h2>
@@ -534,7 +551,7 @@ export default function Home() {
         )}
 
         {/* Tab: Mensageiro Suporte */}
-        {activeTab === 'mensageiro' && (
+        {!isRecepcao && effectiveTab === 'mensageiro' && (
           <ChatSupportModal
             user={user}
             studentsList={students}
@@ -542,7 +559,7 @@ export default function Home() {
         )}
 
         {/* Tab: Dashboard Alunos (Staff only) */}
-        {activeTab === 'dashboard' && isStaff && (
+        {!isRecepcao && effectiveTab === 'dashboard' && isStaff && (
           <AdminDashboard
             students={students}
             onAddStudent={handleAddStudent}

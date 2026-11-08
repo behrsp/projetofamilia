@@ -43,7 +43,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const isStaff = user?.role === 'ADMIN' || user?.role === 'PROFESSOR';
-  const canViewPresenca = isStaff || user?.role === 'RECEPCAO';
+  const isRecepcao = user?.role === 'RECEPCAO';
+  const canViewPresenca = isStaff || isRecepcao;
 
   // Desktop All Tabs
   const navItems = [
@@ -101,7 +102,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Logo & Title */}
             <div 
               className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group min-w-0"
-              onClick={() => setActiveTab('musicas')}
+              onClick={() => setActiveTab(isRecepcao ? 'presenca' : 'musicas')}
             >
               <div className="relative h-9 w-12 sm:h-11 sm:w-14 rounded-xl overflow-hidden p-1 border border-emerald-500/40 bg-slate-900 group-hover:border-emerald-400 transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center shrink-0">
                 <img 
@@ -115,7 +116,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ABADÁ CAPOEIRA
                 </h1>
                 <p className="text-[9px] sm:text-[11px] text-emerald-400/80 font-semibold tracking-widest uppercase truncate">
-                  Acervo & Gestão
+                  {isRecepcao ? 'Painel Exclusivo da Recepção' : 'Acervo & Gestão'}
                 </p>
               </div>
             </div>
@@ -124,10 +125,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
               {user ? (
                 <div className="flex items-center space-x-1.5 sm:space-x-2">
-                  <button
-                    onClick={onOpenProfile}
-                    className="flex items-center space-x-2 p-1 sm:px-3 sm:py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/50 transition-all text-left group"
-                    title="Ver Meu Perfil"
+                  <div
+                    onClick={isRecepcao ? undefined : onOpenProfile}
+                    className={`flex items-center space-x-2 p-1 sm:px-3 sm:py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 ${
+                      isRecepcao ? '' : 'hover:border-emerald-500/50 cursor-pointer'
+                    } transition-all text-left group`}
+                    title={isRecepcao ? 'Recepção' : 'Ver Meu Perfil'}
                   >
                     <div className="w-8 h-8 rounded-full bg-emerald-950 border border-emerald-500/40 flex items-center justify-center overflow-hidden shrink-0">
                       {user.avatar_url ? (
@@ -138,13 +141,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     <div className="hidden sm:block">
                       <p className="text-xs font-bold text-slate-100 group-hover:text-emerald-300 transition-colors truncate max-w-[130px]">
-                        {user.nickname || user.name}
+                        {user.name}
                       </p>
-                      <p className="text-[10px] text-amber-400 font-semibold truncate max-w-[130px]">
-                        {user.corda}
+                      <p className={`text-[10px] font-semibold truncate max-w-[130px] ${
+                        isRecepcao ? 'text-sky-400 uppercase font-extrabold' : 'text-amber-400'
+                      }`}>
+                        {isRecepcao ? 'Recepção' : user.corda}
                       </p>
                     </div>
-                  </button>
+                  </div>
 
                   <button
                     onClick={onLogout}
@@ -158,37 +163,40 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Second Row (Desktop Only): Navigation Tabs Bar - Full Width, No Overflow */}
-          <nav className="hidden lg:flex items-center flex-wrap gap-1.5 py-2 border-t border-slate-800/80">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`relative flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
-                    isActive
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-inner font-bold'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
-                  {item.badge && item.badge > 0 ? (
-                    <span className="ml-1 bg-amber-500 text-slate-950 font-black text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
-                      {item.badge}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </nav>
+          {/* Second Row (Desktop Only): Navigation Tabs Bar - Hidden for Recepção */}
+          {!isRecepcao && (
+            <nav className="hidden lg:flex items-center flex-wrap gap-1.5 py-2 border-t border-slate-800/80">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`relative flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                      isActive
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-inner font-bold'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                    <span>{item.label}</span>
+                    {item.badge && item.badge > 0 ? (
+                      <span className="ml-1 bg-amber-500 text-slate-950 font-black text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </nav>
+          )}
 
         </div>
       </header>
 
-      {/* Mobile App Bottom Navigation Bar - Exactly 5 Items (Grid 100% width, NO horizontal scroll!) */}
+      {/* Mobile App Bottom Navigation Bar - Hidden for Recepção (Recepção only sees Chamada) */}
+      {!isRecepcao && (
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-emerald-500/20 px-1 py-1 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-2xl w-full max-w-full">
         <div className="grid grid-cols-5 w-full items-center">
           
@@ -243,9 +251,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         </div>
       </nav>
+      )}
 
       {/* Mobile Drawer (Bottom Sheet) for Secondary Tabs */}
-      {isMobileDrawerOpen && (
+      {!isRecepcao && isMobileDrawerOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-slate-950/80 backdrop-blur-md animate-fadeIn">
           
           {/* Backdrop Click to close */}
