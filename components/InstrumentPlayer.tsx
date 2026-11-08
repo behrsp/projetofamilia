@@ -34,6 +34,7 @@ export const InstrumentPlayer: React.FC<InstrumentPlayerProps> = ({
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState('');
 
   const isStaff = user?.role === 'ADMIN' || user?.role === 'PROFESSOR';
@@ -64,6 +65,19 @@ export const InstrumentPlayer: React.FC<InstrumentPlayerProps> = ({
     }
   };
 
+  const parseJsonSafe = async (res: Response) => {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(
+        res.status === 413
+          ? 'O arquivo excedeu o limite da requisição. Tente um vídeo menor.'
+          : `Erro no servidor (${res.status}): ${text.slice(0, 80)}`
+      );
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !videoPreview) {
@@ -73,17 +87,69 @@ export const InstrumentPlayer: React.FC<InstrumentPlayerProps> = ({
 
     try {
       setLoading(true);
+      setUploadProgress(5);
       setError('');
+
+      // Split base64 video into 1.8MB chunks to safely bypass Vercel's 4.5MB limit per HTTP request
+      const CHUNK_SIZE = 1_800_000;
+      const totalChunks = Math.ceil(videoPreview.length / CHUNK_SIZE);
+
+      // Step 1: Send first chunk to create the database record
+      const firstChunk = videoPreview.slice(0, CHUNK_SIZE);
+      const initRes = await fetch('/api/instruments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'init',
+          category,
+          title: title.trim(),
+          chunk: firstChunk,
+          duration: 'máx 2 min',
+        }),
+      });
+
+      const initData = await parseJsonSafe(initRes);
+      if (!initRes.ok) {
+        throw new Error(initData.error || 'Erro ao iniciar envio do vídeo.');
+      }
+
+      const instrumentId = initData.id;
+      setUploadProgress(Math.round((1 / totalChunks) * 100));
+
+      // Step 2: Send remaining chunks sequentially
+      for (let i = 1; i < totalChunks; i++) {
+        const chunk = videoPreview.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+        const appendRes = await fetch('/api/instruments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'append',
+            id: instrumentId,
+            chunk,
+          }),
+        });
+
+        const appendData = await parseJsonSafe(appendRes);
+        if (!appendRes.ok) {
+          throw new Error(appendData.error || `Erro ao enviar parte ${i + 1} do vídeo.`);
+        }
+
+        setUploadProgress(Math.round(((i + 1) / totalChunks) * 100));
+      }
+
+      // Refresh parent list
       await onAddInstrument({
         category,
-        title,
-        video_url: videoPreview,
+        title: title.trim(),
+        video_url: `/api/instruments/${instrumentId}`,
         duration: 'máx 2 min',
       });
+
       setIsModalOpen(false);
       setTitle('');
       setVideoFile(null);
       setVideoPreview('');
+      setUploadProgress(0);
     } catch (err: any) {
       setError(err.message || 'Erro ao enviar vídeo.');
     } finally {
@@ -117,7 +183,10 @@ export const InstrumentPlayer: React.FC<InstrumentPlayerProps> = ({
         {/* Upload Button */}
         {isStaff && (
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              setCategory(activeCategory);
+              setIsModalOpen(true);
+            }}
             className="w-full sm:w-auto flex items-center justify-center space-x-2 px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/20 transition-all shrink-0"
           >
             <Upload className="w-5 h-5" />
@@ -281,11 +350,27 @@ export const InstrumentPlayer: React.FC<InstrumentPlayerProps> = ({
                 </div>
               )}
 
+              {loading && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-xs font-bold text-emerald-400">
+                    <span>Enviando vídeo em partes seguras...</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                    <div
+                      className="h-full bg-emerald-500 transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="pt-3 border-t border-slate-800 flex justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 rounded-2xl bg-slate-800 text-slate-300 font-bold text-sm"
+                  disabled={loading}
+                  className="px-5 py-2.5 rounded-2xl bg-slate-800 text-slate-300 font-bold text-sm disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -294,7 +379,7 @@ export const InstrumentPlayer: React.FC<InstrumentPlayerProps> = ({
                   disabled={loading}
                   className="px-6 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/20 disabled:opacity-50"
                 >
-                  {loading ? 'Enviando Vídeo...' : 'Publicar Vídeo'}
+                  {loading ? `Enviando (${uploadProgress}%)...` : 'Publicar Vídeo'}
                 </button>
               </div>
             </form>

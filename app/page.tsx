@@ -190,13 +190,18 @@ export default function Home() {
 
   // Instrument Actions
   const handleAddInstrument = async (data: any) => {
+    // If video was already uploaded via chunked upload in InstrumentPlayer, just refresh data
+    if (data?.video_url && String(data.video_url).startsWith('/api/instruments/')) {
+      await fetchData();
+      return;
+    }
     const res = await fetch('/api/instruments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!res.ok) {
-      const err = await res.json();
+      const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Erro ao salvar vídeo.');
     }
     await fetchData();

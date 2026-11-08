@@ -39,7 +39,34 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       const file = e.target.files[0];
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPhotoUrl(reader.result as string);
+        const rawDataUrl = reader.result as string;
+        // Compress large mobile camera photos on client to avoid Vercel 4.5MB limit
+        const img = new Image();
+        img.onload = () => {
+          const MAX_DIM = 1400;
+          let { width, height } = img;
+          if (width > MAX_DIM || height > MAX_DIM) {
+            if (width > height) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            } else {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            setPhotoUrl(canvas.toDataURL('image/jpeg', 0.82));
+          } else {
+            setPhotoUrl(rawDataUrl);
+          }
+        };
+        img.onerror = () => setPhotoUrl(rawDataUrl);
+        img.src = rawDataUrl;
       };
       reader.readAsDataURL(file);
     }
