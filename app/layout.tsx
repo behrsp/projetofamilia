@@ -40,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className={`${outfit.variable} dark`}>
+    <html lang="pt-BR" className={`${outfit.variable} dark overflow-x-hidden w-full max-w-full`}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <link rel="manifest" href="/manifest.json" />
@@ -51,7 +51,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ABADÁ Capoeira" />
       </head>
-      <body className="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen">
+      <body className="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen overflow-x-hidden w-full max-w-full">
         <RegisterSW />
         {children}
       </body>

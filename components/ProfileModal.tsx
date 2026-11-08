@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, ABADA_CORDAS } from '@/lib/types';
-import { X, User as UserIcon, Camera, Save } from 'lucide-react';
+import { X, User as UserIcon, Camera, Save, Calendar } from 'lucide-react';
+import { formatBirthdateForInput, formatBirthdateBR } from '@/lib/dateUtils';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -29,7 +30,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     if (user) {
       setName(user.name || '');
       setNickname(user.nickname || '');
-      setBirthdate(user.birthdate || '');
+      setBirthdate(formatBirthdateForInput(user.birthdate));
       setCorda(user.corda || 'Crua');
       setAvatarUrl(user.avatar_url || '');
     }
@@ -147,16 +148,26 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-              Data de Nascimento
-            </label>
-            <input
-              type="date"
-              required
-              value={birthdate}
-              onChange={(e) => setBirthdate(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-emerald-500"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Data de Nascimento
+              </label>
+              {birthdate && (
+                <span className="text-[11px] text-emerald-400 font-semibold">
+                  {formatBirthdateBR(birthdate)}
+                </span>
+              )}
+            </div>
+            <div className="relative">
+              <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+              <input
+                type="date"
+                required
+                value={birthdate}
+                onChange={(e) => setBirthdate(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-emerald-500"
+              />
+            </div>
           </div>
 
           <div>

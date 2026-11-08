@@ -189,9 +189,9 @@ export const RequestsManager: React.FC<RequestsManagerProps> = ({
 
       {/* New Request Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="relative w-full max-w-lg bg-slate-900 border border-emerald-500/30 rounded-3xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-5 bg-slate-950 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col bg-slate-900 border border-emerald-500/30 rounded-3xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5 bg-slate-950 border-b border-slate-800 shrink-0">
               <h3 className="text-lg font-bold text-white">Solicitar Conteúdo</h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -201,7 +201,7 @@ export const RequestsManager: React.FC<RequestsManagerProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSubmitNewRequest} className="p-6 space-y-4">
+            <form onSubmit={handleSubmitNewRequest} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
               {error && (
                 <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">
                   {error}

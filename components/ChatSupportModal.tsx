@@ -74,23 +74,23 @@ export const ChatSupportModal: React.FC<ChatSupportModalProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-[75vh] max-h-[700px] bg-slate-900/90 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-md">
+    <div className="flex flex-col h-[72vh] sm:h-[75vh] max-h-[700px] bg-slate-900/90 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-md">
       
       {/* Chat Header */}
-      <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+      <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-2">
+        <div className="flex items-center space-x-3 min-w-0">
+          <div className="p-2 sm:p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shrink-0">
             <MessageSquare className="w-5 h-5" />
           </div>
-          <div>
-            <h3 className="text-base font-extrabold text-white">Mensageiro / Suporte em Tempo Real</h3>
-            <p className="text-xs text-slate-400">Canal de suporte com a administração do grupo</p>
+          <div className="min-w-0">
+            <h3 className="text-sm sm:text-base font-extrabold text-white truncate">Mensageiro / Suporte em Tempo Real</h3>
+            <p className="text-[11px] sm:text-xs text-slate-400 truncate">Canal de suporte com a administração do grupo</p>
           </div>
         </div>
 
         <button
           onClick={fetchMessages}
-          className="p-2 text-slate-400 hover:text-emerald-400 rounded-xl transition-all"
+          className="p-2 text-slate-400 hover:text-emerald-400 rounded-xl transition-all shrink-0"
           title="Atualizar mensagens"
         >
           <RefreshCw className="w-4 h-4" />
@@ -99,12 +99,12 @@ export const ChatSupportModal: React.FC<ChatSupportModalProps> = ({
 
       {/* Staff Selector to pick student conversation */}
       {isStaff && studentsList.length > 0 && (
-        <div className="px-6 py-2.5 bg-slate-950/60 border-b border-slate-800 flex items-center space-x-2">
-          <span className="text-xs font-bold text-amber-400">Conversar com Aluno:</span>
+        <div className="px-4 sm:px-6 py-2.5 bg-slate-950/60 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+          <span className="text-xs font-bold text-amber-400 shrink-0">Conversar com Aluno:</span>
           <select
             value={selectedStudentId}
             onChange={(e) => setSelectedStudentId(e.target.value)}
-            className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs"
+            className="w-full sm:flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs"
           >
             <option value="">-- Todos os Alunos / Suporte Geral --</option>
             {studentsList.map((st) => (
@@ -117,7 +117,7 @@ export const ChatSupportModal: React.FC<ChatSupportModalProps> = ({
       )}
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-slate-950/40 scrollbar-thin scrollbar-thumb-emerald-500/30">
+      <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 bg-slate-950/40 scrollbar-thin scrollbar-thumb-emerald-500/30">
         {messages.length === 0 ? (
           <div className="text-center py-12 text-slate-500 text-xs">
             Nenhuma mensagem trocada ainda. Escreva sua primeira mensagem abaixo!
@@ -134,7 +134,7 @@ export const ChatSupportModal: React.FC<ChatSupportModalProps> = ({
                   {msg.sender_name || 'Usuário'} ({msg.sender_role || 'ALUNO'})
                 </span>
                 <div
-                  className={`max-w-xs sm:max-w-md px-4 py-3 rounded-2xl text-xs leading-relaxed ${
+                  className={`max-w-[85%] sm:max-w-md px-4 py-3 rounded-2xl text-xs leading-relaxed break-words ${
                     isMe
                       ? 'bg-emerald-600 text-white rounded-tr-none shadow-lg shadow-emerald-600/20'
                       : 'bg-slate-800 text-slate-100 rounded-tl-none border border-slate-700'
@@ -153,18 +153,18 @@ export const ChatSupportModal: React.FC<ChatSupportModalProps> = ({
       </div>
 
       {/* Input Area */}
-      <form onSubmit={handleSendMessage} className="p-4 bg-slate-950 border-t border-slate-800 flex items-center space-x-3">
+      <form onSubmit={handleSendMessage} className="p-3 sm:p-4 bg-slate-950 border-t border-slate-800 flex items-center space-x-2 sm:space-x-3">
         <input
           type="text"
-          placeholder="Escreva sua mensagem para o suporte..."
+          placeholder="Escreva sua mensagem..."
           value={inputContent}
           onChange={(e) => setInputContent(e.target.value)}
-          className="flex-1 px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-emerald-500"
+          className="flex-1 min-w-0 px-3.5 sm:px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-emerald-500"
         />
         <button
           type="submit"
           disabled={loading || !inputContent.trim()}
-          className="p-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50"
+          className="p-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50 shrink-0"
         >
           <Send className="w-4 h-4" />
         </button>

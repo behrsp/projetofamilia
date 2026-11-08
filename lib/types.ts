@@ -12,6 +12,17 @@ export interface User {
   created_at?: string;
 }
 
+export interface UserUpdatePayload {
+  name?: string;
+  nickname?: string;
+  phone?: string;
+  birthdate?: string;
+  corda?: string;
+  role?: UserRole;
+  password?: string;
+  avatar_url?: string;
+}
+
 export const ABADA_CORDAS = [
   { level: 'Iniciante', name: 'Crua', color: '#e2e8f0', textColor: '#1e293b', description: 'Cor neutral. Dada para iniciantes na Capoeira sem conhecimento prévio.' },
   { level: 'Aluno', name: 'Crua-Amarela', color: '#fef08a', textColor: '#854d0e', description: 'Transformação. Primeira corda recebida no batizado, com o apelido oficial.' },
@@ -108,4 +119,46 @@ export interface ChatMessage {
   content: string;
   is_read: boolean;
   created_at: string;
+}
+
+export interface Checkin {
+  id: string;
+  user_id: string;
+  checkin_date: string; // YYYY-MM-DD
+  registered_by?: string;
+  notes?: string;
+  created_at: string;
+  user_name?: string;
+  user_nickname?: string;
+  user_corda?: string;
+  user_phone?: string;
+  user_avatar?: string;
+}
+
+export interface StudentAttendanceStats {
+  user: User;
+  presencasMes: number;
+  presencasAno: number;
+  totalAulasOcorridas: number;
+  totalAulasMes: number;
+  faltasMes: number;
+  frequenciaPct: number;
+  alertaFaltas: boolean; // true se faltasMes > 3
+  datasComparecidas: string[];
+}
+
+export interface AttendanceDashboardData {
+  month: number;
+  year: number;
+  monthName: string;
+  totalAulasMes: number;
+  totalAulasOcorridas: number;
+  classDates: string[];
+  studentsStats: StudentAttendanceStats[];
+  totalCheckinsMes: number;
+  mediaAlunosPorAula: number;
+  alunosEmAlertaCount: number;
+  todayCheckins: Checkin[];
+  isTodayClassDay: boolean;
+  todayDateStr: string;
 }

@@ -87,18 +87,18 @@ export const EventCard: React.FC<EventCardProps> = ({
                 )}
 
                 {/* Content */}
-                <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                <div className="p-4 sm:p-6 flex-1 flex flex-col justify-between space-y-4">
                   <div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-bold text-amber-400 flex items-center space-x-1.5 bg-amber-400/10 px-3 py-1 rounded-full border border-amber-400/20">
-                        <CalendarIcon className="w-3.5 h-3.5" />
-                        <span>Data: {evt.event_date}</span>
+                        <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Data: {evt.event_date}</span>
                       </span>
 
                       {isStaff && (
                         <button
                           onClick={() => onDeleteEvent(evt.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
+                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all shrink-0"
                           title="Excluir Evento"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -106,10 +106,10 @@ export const EventCard: React.FC<EventCardProps> = ({
                       )}
                     </div>
 
-                    <h3 className="text-xl font-extrabold text-white mt-3 group-hover:text-emerald-300 transition-colors">
+                    <h3 className="text-lg sm:text-xl font-extrabold text-white mt-3 group-hover:text-emerald-300 transition-colors break-words">
                       {evt.title}
                     </h3>
-                    <p className="text-xs text-slate-300 mt-2 leading-relaxed whitespace-pre-line">
+                    <p className="text-xs text-slate-300 mt-2 leading-relaxed whitespace-pre-line break-words">
                       {evt.description}
                     </p>
                   </div>
@@ -124,45 +124,45 @@ export const EventCard: React.FC<EventCardProps> = ({
                       {/* VOU */}
                       <button
                         onClick={() => onRsvp(evt.id, 'VOU')}
-                        className={`flex items-center justify-center space-x-1.5 py-2.5 rounded-2xl text-xs font-extrabold transition-all ${
+                        className={`flex items-center justify-center space-x-1 sm:space-x-1.5 py-2.5 px-2 rounded-2xl text-xs font-extrabold transition-all ${
                           evt.my_rsvp === 'VOU'
                             ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400'
                             : 'bg-slate-950 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10'
                         }`}
                       >
-                        <CheckCircle className="w-4 h-4" />
+                        <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                         <span>Vou</span>
                       </button>
 
                       {/* NAO SEI */}
                       <button
                         onClick={() => onRsvp(evt.id, 'NAO_SEI')}
-                        className={`flex items-center justify-center space-x-1.5 py-2.5 rounded-2xl text-xs font-extrabold transition-all ${
+                        className={`flex items-center justify-center space-x-1 sm:space-x-1.5 py-2.5 px-2 rounded-2xl text-xs font-extrabold transition-all ${
                           evt.my_rsvp === 'NAO_SEI'
                             ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 ring-2 ring-amber-400'
                             : 'bg-slate-950 text-amber-400 border border-amber-500/30 hover:bg-amber-500/10'
                         }`}
                       >
-                        <HelpCircle className="w-4 h-4" />
+                        <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                         <span>Não Sei</span>
                       </button>
 
                       {/* NAO VOU */}
                       <button
                         onClick={() => onRsvp(evt.id, 'NAO_VOU')}
-                        className={`flex items-center justify-center space-x-1.5 py-2.5 rounded-2xl text-xs font-extrabold transition-all ${
+                        className={`flex items-center justify-center space-x-1 sm:space-x-1.5 py-2.5 px-2 rounded-2xl text-xs font-extrabold transition-all ${
                           evt.my_rsvp === 'NAO_VOU'
                             ? 'bg-red-500 text-white shadow-lg shadow-red-500/30 ring-2 ring-red-400'
                             : 'bg-slate-950 text-red-400 border border-red-500/30 hover:bg-red-500/10'
                         }`}
                       >
-                        <XCircle className="w-4 h-4" />
+                        <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                         <span>Não Vou</span>
                       </button>
                     </div>
 
                     {/* Consolidated Attendance Stats */}
-                    <div className="flex items-center justify-between pt-2 text-[11px] font-semibold text-slate-400">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-[11px] font-semibold text-slate-400">
                       <div className="flex items-center space-x-3">
                         <span className="text-emerald-400">Vou: {counts.vou}</span>
                         <span className="text-amber-400">Dúvida: {counts.nao_sei}</span>

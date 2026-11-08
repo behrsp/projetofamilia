@@ -14,13 +14,25 @@ import {
   X,
   Phone,
   Calendar,
-  Lock
+  Lock,
+  Cake,
+  Camera,
+  AlertCircle,
+  KeyRound,
+  Sparkles
 } from 'lucide-react';
+import { 
+  formatBirthdateBR, 
+  formatBirthdateForInput, 
+  calculateAge, 
+  isBirthdayToday,
+  getCordInfo 
+} from '@/lib/dateUtils';
 
 interface AdminDashboardProps {
   students: User[];
   onAddStudent: (data: any) => Promise<void>;
-  onUpdateStudent: (id: string, data: Partial<User>) => Promise<void>;
+  onUpdateStudent: (id: string, data: any) => Promise<void>;
   onDeleteStudent: (id: string) => Promise<void>;
   onOpenCordGuide: () => void;
 }
@@ -35,13 +47,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCordFilter, setSelectedCordFilter] = useState('');
   
-  // Edit Modal state
+  // Edit Modal state - Full profile edit by administrator
   const [editingStudent, setEditingStudent] = useState<User | null>(null);
-  const [editCorda, setEditCorda] = useState('');
-  const [editRole, setEditRole] = useState<UserRole>('ALUNO');
   const [editName, setEditName] = useState('');
   const [editNickname, setEditNickname] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editBirthdate, setEditBirthdate] = useState('');
+  const [editCorda, setEditCorda] = useState('');
+  const [editRole, setEditRole] = useState<UserRole>('ALUNO');
+  const [editPassword, setEditPassword] = useState('');
+  const [editAvatarUrl, setEditAvatarUrl] = useState('');
+  const [editError, setEditError] = useState('');
 
   // Add Student Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -66,34 +82,63 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const matchesSearch =
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.nickname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.phone.includes(searchTerm);
+      s.phone.includes(searchTerm) ||
+      (s.birthdate && s.birthdate.includes(searchTerm));
     const matchesCord = selectedCordFilter ? s.corda === selectedCordFilter : true;
     return matchesSearch && matchesCord;
   });
 
   const handleStartEdit = (student: User) => {
     setEditingStudent(student);
-    setEditCorda(student.corda);
-    setEditRole(student.role);
-    setEditName(student.name);
-    setEditNickname(student.nickname);
-    setEditPhone(student.phone);
+    setEditName(student.name || '');
+    setEditNickname(student.nickname || '');
+    setEditPhone(student.phone || '');
+    setEditBirthdate(formatBirthdateForInput(student.birthdate));
+    setEditCorda(student.corda || 'Crua');
+    setEditRole(student.role || 'ALUNO');
+    setEditAvatarUrl(student.avatar_url || '');
+    setEditPassword('');
+    setEditError('');
   };
 
-  const handleSaveEdit = async () => {
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditAvatarUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!editingStudent) return;
+
+    if (!editName.trim() || !editNickname.trim() || !editPhone.trim() || !editBirthdate.trim()) {
+      setEditError('Nome, apelido, telefone e data de nascimento são obrigatórios.');
+      return;
+    }
+
     try {
       setLoading(true);
+      setEditError('');
+
       await onUpdateStudent(editingStudent.id, {
-        name: editName,
-        nickname: editNickname,
-        phone: editPhone,
+        name: editName.trim(),
+        nickname: editNickname.trim(),
+        phone: editPhone.trim(),
+        birthdate: editBirthdate.trim(),
         corda: editCorda,
         role: editRole,
+        password: editPassword.trim() ? editPassword.trim() : undefined,
+        avatar_url: editAvatarUrl,
       });
+
       setEditingStudent(null);
     } catch (err: any) {
-      alert(err.message || 'Erro ao atualizar aluno.');
+      setEditError(err.message || 'Erro ao atualizar cadastro do aluno.');
     } finally {
       setLoading(false);
     }
@@ -110,11 +155,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setLoading(true);
       setError('');
       await onAddStudent({
-        name: newName,
-        nickname: newNickname,
-        phone: newPhone,
+        name: newName.trim(),
+        nickname: newNickname.trim(),
+        phone: newPhone.trim(),
         password: newPassword || '123456',
-        birthdate: newBirthdate,
+        birthdate: newBirthdate.trim(),
         corda: newCorda,
         role: newRole,
       });
@@ -133,6 +178,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setLoading(false);
     }
   };
+
+  const currentEditCord = getCordInfo(editCorda);
 
   return (
     <div className="space-y-8">
@@ -154,7 +201,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <Award className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Graduação Ativa</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Graduações Ativas</p>
             <h3 className="text-2xl font-extrabold text-amber-300 mt-0.5">{Object.keys(cordCounts).length} Cordas</h3>
           </div>
         </div>
@@ -189,11 +236,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-3xl border border-slate-800 backdrop-blur-md">
         
         {/* Search */}
-        <div className="relative w-full md:w-72">
+        <div className="relative w-full md:w-80">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Buscar aluno por nome, apelido..."
+            placeholder="Buscar por nome, apelido, telefone ou data..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-emerald-500"
@@ -227,108 +274,257 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
       </div>
 
-      {/* Student List Table */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto">
+      {/* Student List Table & Mobile Cards */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl w-full">
+        
+        {/* MOBILE CARDS VIEW (block md:hidden - Zero horizontal scroll on phones) */}
+        <div className="block md:hidden p-3 space-y-3">
+          {filteredStudents.length === 0 ? (
+            <div className="py-12 text-center text-slate-500 text-xs">
+              Nenhum aluno encontrado para os critérios de busca.
+            </div>
+          ) : (
+            filteredStudents.map((st) => {
+              const age = calculateAge(st.birthdate);
+              const isToday = isBirthdayToday(st.birthdate);
+              const cordInfo = getCordInfo(st.corda);
+
+              return (
+                <div
+                  key={st.id}
+                  className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3"
+                >
+                  {/* Card Header: Avatar, Name, Nickname, Corda */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-emerald-300 text-xs overflow-hidden shrink-0 shadow-sm"
+                        style={{ border: `2px solid ${cordInfo.color}` }}
+                      >
+                        {st.avatar_url ? (
+                          <img src={st.avatar_url} alt={st.nickname} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="bg-slate-900 w-full h-full flex items-center justify-center">
+                            {st.name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-extrabold text-white text-sm truncate">
+                          {st.name}
+                        </h4>
+                        <p className="text-amber-400 font-semibold text-xs truncate">
+                          &quot;{st.nickname}&quot;
+                        </p>
+                      </div>
+                    </div>
+
+                    <span 
+                      className="px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm shrink-0"
+                      style={{
+                        backgroundColor: cordInfo.color,
+                        color: cordInfo.textColor,
+                        border: '1px solid rgba(0,0,0,0.15)',
+                      }}
+                    >
+                      {st.corda}
+                    </span>
+                  </div>
+
+                  {/* Info Chips */}
+                  <div className="grid grid-cols-2 gap-2 text-xs py-2 px-3 rounded-xl bg-slate-900 border border-slate-800/80">
+                    <div className="flex items-center space-x-1.5 text-slate-300 truncate">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="font-mono text-[11px] truncate">{st.phone}</span>
+                    </div>
+
+                    <div className="flex items-center space-x-1.5 text-slate-300 truncate">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="text-[11px] truncate">
+                        {formatBirthdateBR(st.birthdate)}
+                        {age !== null ? ` (${age}a)` : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Birthday badge if today & Role tag */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full font-extrabold text-[9px] uppercase ${
+                        st.role === 'ADMIN'
+                          ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                          : st.role === 'PROFESSOR'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      }`}
+                    >
+                      {st.role}
+                    </span>
+
+                    {isToday && (
+                      <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-pink-500/20 text-pink-300 border border-pink-500/30 animate-pulse">
+                        <Cake className="w-3 h-3 text-pink-400" />
+                        <span>Aniversário Hoje!</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-4 gap-2 pt-1 border-t border-slate-900">
+                    <button
+                      onClick={() => handleStartEdit(st)}
+                      className="col-span-3 flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500 text-amber-300 hover:text-white border border-amber-500/30 text-xs font-bold transition-all"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Alterar Cadastro</span>
+                    </button>
+                    <button
+                      onClick={() => onDeleteStudent(st.id)}
+                      className="col-span-1 flex items-center justify-center py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/30 text-xs font-bold transition-all"
+                      title="Excluir Aluno"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* DESKTOP TABLE VIEW (hidden md:block) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider font-bold border-b border-slate-800">
               <tr>
                 <th className="px-6 py-4">Aluno / Apelido</th>
-                <th className="px-6 py-4">Telefone</th>
-                <th className="px-6 py-4">Nascimento</th>
+                <th className="px-6 py-4">Telefone (Login)</th>
+                <th className="px-6 py-4">Nascimento / Idade</th>
                 <th className="px-6 py-4">Graduação (Corda)</th>
                 <th className="px-6 py-4">Função</th>
-                <th className="px-6 py-4 text-right">Ações</th>
+                <th className="px-6 py-4 text-right">Ações de Gestão</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80 text-slate-200">
               {filteredStudents.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                    Nenhum aluno encontrado.
+                    Nenhum aluno encontrado para os critérios de busca.
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((st) => (
-                  <tr key={st.id} className="hover:bg-slate-800/40 transition-colors">
-                    
-                    {/* Name & Nickname */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-9 h-9 rounded-full bg-emerald-950 border border-emerald-500/40 flex items-center justify-center font-bold text-emerald-300">
-                          {st.name.charAt(0)}
+                filteredStudents.map((st) => {
+                  const age = calculateAge(st.birthdate);
+                  const isToday = isBirthdayToday(st.birthdate);
+                  const cordInfo = getCordInfo(st.corda);
+
+                  return (
+                    <tr key={st.id} className="hover:bg-slate-800/40 transition-colors">
+                      
+                      {/* Name & Nickname */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="relative w-10 h-10 rounded-full bg-slate-950 border border-emerald-500/40 flex items-center justify-center font-bold text-emerald-300 overflow-hidden shrink-0">
+                            {st.avatar_url ? (
+                              <img src={st.avatar_url} alt={st.nickname} className="w-full h-full object-cover" />
+                            ) : (
+                              <span>{st.name.charAt(0).toUpperCase()}</span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="font-extrabold text-white text-sm block">
+                              {st.name}
+                            </span>
+                            <span className="text-amber-400 font-semibold">
+                              &quot;{st.nickname}&quot;
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="font-extrabold text-white text-sm block">
-                            {st.name}
-                          </span>
-                          <span className="text-amber-400 font-semibold">
-                            &quot;{st.nickname}&quot;
-                          </span>
+                      </td>
+
+                      {/* Phone */}
+                      <td className="px-6 py-4 font-mono">
+                        <div className="flex items-center space-x-1.5 text-slate-300">
+                          <Phone className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{st.phone}</span>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Phone */}
-                    <td className="px-6 py-4 font-mono">
-                      <div className="flex items-center space-x-1.5 text-slate-300">
-                        <Phone className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{st.phone}</span>
-                      </div>
-                    </td>
+                      {/* Birthdate & Age */}
+                      <td className="px-6 py-4">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center space-x-1.5 text-slate-300 font-medium">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{formatBirthdateBR(st.birthdate)}</span>
+                          </div>
+                          {age !== null && (
+                            <span className="text-[10px] text-slate-400 block pl-5">
+                              {age} {age === 1 ? 'ano' : 'anos'}
+                            </span>
+                          )}
+                          {isToday && (
+                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 mt-1 rounded-full text-[10px] font-extrabold bg-pink-500/20 text-pink-300 border border-pink-500/30 animate-pulse">
+                              <Cake className="w-3 h-3 text-pink-400" />
+                              <span>Aniversário Hoje!</span>
+                            </span>
+                          )}
+                        </div>
+                      </td>
 
-                    {/* Birthdate */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-1.5 text-slate-400">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>{st.birthdate}</span>
-                      </div>
-                    </td>
-
-                    {/* Corda Badge */}
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 rounded-full font-bold text-slate-900 bg-amber-400 border border-amber-300 shadow-sm inline-block">
-                        {st.corda}
-                      </span>
-                    </td>
-
-                    {/* Role */}
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-3 py-1 rounded-full font-extrabold text-[10px] uppercase ${
-                          st.role === 'ADMIN'
-                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                            : st.role === 'PROFESSOR'
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                            : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        }`}
-                      >
-                        {st.role}
-                      </span>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          onClick={() => handleStartEdit(st)}
-                          className="p-2 text-slate-300 hover:text-amber-400 hover:bg-amber-400/10 rounded-xl transition-all"
-                          title="Gerenciar / Alterar Corda e Função"
+                      {/* Corda Badge */}
+                      <td className="px-6 py-4">
+                        <span 
+                          className="px-3 py-1 rounded-full font-bold shadow-sm inline-block text-xs"
+                          style={{
+                            backgroundColor: cordInfo.color,
+                            color: cordInfo.textColor,
+                            border: '1px solid rgba(0,0,0,0.15)'
+                          }}
                         >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => onDeleteStudent(st.id)}
-                          className="p-2 text-slate-300 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
-                          title="Excluir Aluno"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                          {st.corda}
+                        </span>
+                      </td>
 
-                  </tr>
-                ))
+                      {/* Role */}
+                      <td className="px-6 py-4">
+                        <span
+                          className={`px-3 py-1 rounded-full font-extrabold text-[10px] uppercase ${
+                            st.role === 'ADMIN'
+                              ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              : st.role === 'PROFESSOR'
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          }`}
+                        >
+                          {st.role}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => handleStartEdit(st)}
+                            className="flex items-center space-x-1.5 px-3 py-1.5 text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500 border border-amber-500/30 rounded-xl transition-all font-semibold"
+                            title="Alterar cadastro completo (Nome, Nascimento, Telefone, Corda, Senha)"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span className="text-xs">Alterar Cadastro</span>
+                          </button>
+                          <button
+                            onClick={() => onDeleteStudent(st.id)}
+                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
+                            title="Excluir Aluno"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -344,7 +540,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
                   <UserPlus className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-white">Cadastrar Novo Aluno</h3>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Cadastrar Novo Aluno</h3>
+                  <p className="text-xs text-slate-400">Preencha os dados cadastrais do novo integrante</p>
+                </div>
               </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
@@ -356,8 +555,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <form onSubmit={handleCreateStudent} className="p-6 space-y-4 overflow-y-auto max-h-[80vh]">
               {error && (
-                <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">
-                  {error}
+                <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
                 </div>
               )}
 
@@ -468,76 +668,239 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* Edit Student Modal */}
+      {/* Edit Student Modal - Complete Administration */}
       {editingStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="relative w-full max-w-md bg-slate-900 border border-emerald-500/30 rounded-3xl shadow-2xl p-6 space-y-4">
-            <h3 className="text-lg font-extrabold text-white">Gerenciar Aluno</h3>
+          <div className="relative w-full max-w-lg bg-slate-900 border border-emerald-500/40 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
             
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Nome Completo</label>
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Apelido na Capoeira</label>
-              <input
-                type="text"
-                value={editNickname}
-                onChange={(e) => setEditNickname(e.target.value)}
-                className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Corda (Graduação ABADÁ)</label>
-              <select
-                value={editCorda}
-                onChange={(e) => setEditCorda(e.target.value)}
-                className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs"
-              >
-                {ABADA_CORDAS.map((c) => (
-                  <option key={c.name} value={c.name}>
-                    {c.name} ({c.level})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Função no Sistema</label>
-              <select
-                value={editRole}
-                onChange={(e) => setEditRole(e.target.value as UserRole)}
-                className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs"
-              >
-                <option value="ALUNO">ALUNO</option>
-                <option value="PROFESSOR">PROFESSOR</option>
-                <option value="ADMIN">ADMINISTRADOR</option>
-              </select>
-            </div>
-
-            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 bg-slate-950 border-b border-slate-800">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-white">Editar Cadastro do Aluno</h3>
+                  <p className="text-xs text-slate-400">
+                    Ajuste qualquer dado: data de nascimento, telefone, graduação ou senha
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={() => setEditingStudent(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
+                className="p-2 text-slate-400 hover:text-white rounded-xl"
               >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                disabled={loading}
-                className="px-5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-lg shadow-emerald-600/30"
-              >
-                {loading ? 'Salvando...' : 'Salvar Alterações'}
+                <X className="w-5 h-5" />
               </button>
             </div>
 
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-4 overflow-y-auto max-h-[80vh]">
+              {editError && (
+                <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{editError}</span>
+                </div>
+              )}
+
+              {/* Avatar Preview & Upload */}
+              <div className="flex items-center space-x-4 p-3 rounded-2xl bg-slate-950 border border-slate-800">
+                <div className="relative w-16 h-16 rounded-full bg-slate-900 border-2 border-emerald-500/40 flex items-center justify-center overflow-hidden shrink-0">
+                  {editAvatarUrl ? (
+                    <img src={editAvatarUrl} alt={editNickname} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xl font-black text-emerald-400">
+                      {editName.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <label className="absolute inset-0 bg-slate-950/60 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity">
+                    <Camera className="w-5 h-5 text-white" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-white">Foto de Perfil</p>
+                  <p className="text-[11px] text-slate-400">Passe o mouse ou toque para enviar nova imagem</p>
+                  {editAvatarUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setEditAvatarUrl('')}
+                      className="text-[10px] text-red-400 hover:underline mt-1 font-semibold"
+                    >
+                      Remover foto
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Nome Completo */}
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                  Nome Completo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Apelido na Capoeira */}
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                  Apelido na Capoeira *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editNickname}
+                  onChange={(e) => setEditNickname(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Data de Nascimento - Critical Requirement */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-300 uppercase">
+                    Data de Nascimento *
+                  </label>
+                  {editBirthdate && (
+                    <span className="text-[11px] text-emerald-400 font-semibold">
+                      Exibição: {formatBirthdateBR(editBirthdate)}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+                  <input
+                    type="date"
+                    required
+                    value={editBirthdate}
+                    onChange={(e) => setEditBirthdate(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  * Caso o aluno tenha preenchido a data errada no cadastro, corrija aqui.
+                </p>
+              </div>
+
+              {/* Telefone / WhatsApp (Login) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                  Telefone (Login / WhatsApp) *
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="41999999999"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Graduação (Corda ABADÁ) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-300 uppercase">
+                    Graduação (Corda ABADÁ)
+                  </label>
+                  <span 
+                    className="px-2.5 py-0.5 rounded-full text-[10px] font-bold"
+                    style={{
+                      backgroundColor: currentEditCord.color,
+                      color: currentEditCord.textColor,
+                    }}
+                  >
+                    {currentEditCord.name}
+                  </span>
+                </div>
+                <select
+                  value={editCorda}
+                  onChange={(e) => setEditCorda(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                >
+                  {ABADA_CORDAS.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name} ({c.level})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Função no Sistema */}
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                  Função no Sistema
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                >
+                  <option value="ALUNO">ALUNO (Acesso comum)</option>
+                  <option value="PROFESSOR">PROFESSOR (Gestão de alunos e pedidos)</option>
+                  <option value="ADMIN">ADMINISTRADOR (Acesso total)</option>
+                </select>
+              </div>
+
+              {/* Redefinição de Senha (Opcional) */}
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                <div className="flex items-center space-x-2 text-slate-300">
+                  <KeyRound className="w-4 h-4 text-amber-400" />
+                  <label className="text-xs font-bold uppercase">
+                    Redefinir Senha do Aluno (Opcional)
+                  </label>
+                </div>
+                <input
+                  type="password"
+                  placeholder="Deixe em branco para manter a senha atual"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  className="w-full px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:border-amber-500 font-mono"
+                />
+                <p className="text-[10px] text-slate-500">
+                  * Preencha apenas se o aluno esqueceu a senha e solicitou a redefinição.
+                </p>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingStudent(null)}
+                  className="px-5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 disabled:opacity-50 transition-all flex items-center space-x-1.5"
+                >
+                  {loading ? (
+                    <span>Salvando...</span>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Salvar Todas as Alterações</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </form>
           </div>
         </div>
       )}

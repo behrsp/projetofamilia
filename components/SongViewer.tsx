@@ -117,8 +117,8 @@ export const SongViewer: React.FC<SongViewerProps> = ({
                 </p>
 
                 {/* Lyrics Preview */}
-                <div className="mt-3 p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80">
-                  <p className="text-xs text-slate-300 italic line-clamp-4 whitespace-pre-line font-mono">
+                <div className="mt-3 p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 overflow-hidden">
+                  <p className="text-xs text-slate-300 italic line-clamp-4 whitespace-pre-line font-mono break-words">
                     {song.lyrics}
                   </p>
                 </div>

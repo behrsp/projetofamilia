@@ -55,7 +55,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-950/40 via-slate-950 to-slate-950">
+    <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-950/40 via-slate-950 to-slate-950 overflow-x-hidden w-full max-w-full">
 
       <div className="relative w-full max-w-lg bg-slate-900/90 border border-emerald-500/30 rounded-3xl shadow-2xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
 

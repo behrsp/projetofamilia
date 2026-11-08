@@ -95,17 +95,17 @@ export const InstrumentPlayer: React.FC<InstrumentPlayerProps> = ({
     <div className="space-y-6">
       
       {/* Category Tabs & Upload Action */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-3xl border border-slate-800 backdrop-blur-md">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 bg-slate-900/60 p-3.5 sm:p-4 rounded-3xl border border-slate-800 backdrop-blur-md">
         
         {/* Categories Bar */}
-        <div className="flex items-center space-x-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-none">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className={`px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+              className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex-1 sm:flex-initial text-center ${
                 activeCategory === cat
-                  ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 scale-105'
+                  ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
                   : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
               }`}
             >
@@ -201,16 +201,16 @@ export const InstrumentPlayer: React.FC<InstrumentPlayerProps> = ({
 
       {/* Upload Video Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="relative w-full max-w-lg bg-slate-900 border border-emerald-500/30 rounded-3xl shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col bg-slate-900 border border-emerald-500/30 rounded-3xl shadow-2xl overflow-hidden">
             
-            <div className="flex items-center justify-between px-6 py-5 bg-slate-950 border-b border-slate-800">
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5 bg-slate-950 border-b border-slate-800 shrink-0">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
                   <Video className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Postar Vídeo de Instrumento</h3>
+                  <h3 className="text-base sm:text-lg font-bold text-white">Postar Vídeo de Instrumento</h3>
                   <p className="text-xs text-amber-400 font-medium">Duração máxima: 2 minutos</p>
                 </div>
               </div>
@@ -222,7 +222,7 @@ export const InstrumentPlayer: React.FC<InstrumentPlayerProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
               {error && (
                 <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">
                   {error}

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getAuthSession } from '@/lib/auth';
+import bcrypt from 'bcryptjs';
+import { getAuthSession, sanitizePhone } from '@/lib/auth';
 import { pool, initDb } from '@/lib/db';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -12,24 +13,58 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const { id } = await params;
     const body = await req.json();
-    const { name, nickname, phone, corda, role, birthdate } = body;
+    const { name, nickname, phone, corda, role, birthdate, password, avatar_url } = body;
+
+    // Check if user exists
+    const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (userRes.rows.length === 0) {
+      return NextResponse.json({ error: 'Aluno não encontrado' }, { status: 404 });
+    }
+    const currentUser = userRes.rows[0];
+
+    // Validate and sanitize phone if provided
+    let finalPhone = currentUser.phone;
+    if (phone !== undefined && phone !== null && phone.trim() !== '') {
+      finalPhone = sanitizePhone(phone);
+      if (finalPhone.length < 8) {
+        return NextResponse.json({ error: 'Número de telefone inválido. Informe com DDD.' }, { status: 400 });
+      }
+      const existingPhone = await pool.query('SELECT id FROM users WHERE phone = $1 AND id != $2', [finalPhone, id]);
+      if (existingPhone.rows.length > 0) {
+        return NextResponse.json({ error: 'Este telefone já está cadastrado para outro aluno.' }, { status: 400 });
+      }
+    }
+
+    // Handle password update if supplied
+    let passwordHash = currentUser.password_hash;
+    if (password && typeof password === 'string' && password.trim().length > 0) {
+      if (password.trim().length < 4) {
+        return NextResponse.json({ error: 'A nova senha deve conter pelo menos 4 caracteres.' }, { status: 400 });
+      }
+      passwordHash = await bcrypt.hash(password.trim(), 10);
+    }
+
+    const finalName = name !== undefined && name.trim() !== '' ? name.trim() : currentUser.name;
+    const finalNickname = nickname !== undefined && nickname.trim() !== '' ? nickname.trim() : currentUser.nickname;
+    const finalBirthdate = birthdate !== undefined && birthdate.trim() !== '' ? birthdate.trim() : currentUser.birthdate;
+    const finalCorda = corda !== undefined && corda.trim() !== '' ? corda.trim() : currentUser.corda;
+    const finalRole = role !== undefined && role.trim() !== '' ? role.trim() : currentUser.role;
+    const finalAvatarUrl = avatar_url !== undefined ? avatar_url : currentUser.avatar_url;
 
     const res = await pool.query(
       `UPDATE users
-       SET name = COALESCE($1, name),
-           nickname = COALESCE($2, nickname),
-           phone = COALESCE($3, phone),
-           corda = COALESCE($4, corda),
-           role = COALESCE($5, role),
-           birthdate = COALESCE($6, birthdate)
-       WHERE id = $7
-       RETURNING id, name, nickname, phone, birthdate, corda, role, avatar_url`,
-      [name, nickname, phone, corda, role, birthdate, id]
+       SET name = $1,
+           nickname = $2,
+           phone = $3,
+           corda = $4,
+           role = $5,
+           birthdate = $6,
+           password_hash = $7,
+           avatar_url = $8
+       WHERE id = $9
+       RETURNING id, name, nickname, phone, birthdate, corda, role, avatar_url, created_at`,
+      [finalName, finalNickname, finalPhone, finalCorda, finalRole, finalBirthdate, passwordHash, finalAvatarUrl, id]
     );
-
-    if (res.rows.length === 0) {
-      return NextResponse.json({ error: 'Aluno não encontrado' }, { status: 404 });
-    }
 
     return NextResponse.json({ success: true, user: res.rows[0] });
   } catch (error: any) {

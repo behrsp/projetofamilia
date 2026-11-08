@@ -127,6 +127,21 @@ export async function initDb() {
       );
     `);
 
+    // 9. Check-ins de Presença (Aulas de Segundas e Quartas)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS checkins (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        checkin_date DATE NOT NULL,
+        registered_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        notes VARCHAR(255) DEFAULT 'Presença confirmada',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT unique_user_checkin_date UNIQUE (user_id, checkin_date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins(checkin_date);
+      CREATE INDEX IF NOT EXISTS idx_checkins_user ON checkins(user_id);
+    `);
+
     // Ensure Admin Account Exists
     const adminPhone = '41984842941';
     const adminCheck = await client.query('SELECT id FROM users WHERE phone = $1', [adminPhone]);
