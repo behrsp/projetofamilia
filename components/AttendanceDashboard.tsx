@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { User, StudentAttendanceStats, AttendanceDashboardData, Checkin } from '@/lib/types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { User, UserRole, StudentAttendanceStats, AttendanceDashboardData, Checkin } from '@/lib/types';
 import { 
   ClipboardCheck, 
   Calendar, 
@@ -9,7 +9,6 @@ import {
   AlertTriangle, 
   Download, 
   Printer, 
-  Mail, 
   Plus, 
   Search, 
   ChevronLeft, 
@@ -23,9 +22,10 @@ import {
   TrendingUp, 
   Flame,
   FileSpreadsheet,
-  Copy,
-  ExternalLink,
-  RotateCcw
+  FileText,
+  Send,
+  RotateCcw,
+  Eye
 } from 'lucide-react';
 import { 
   MONTH_NAMES, 
@@ -38,6 +38,7 @@ import {
 
 interface AttendanceDashboardProps {
   students: User[];
+  userRole?: UserRole;
   dashboardData: AttendanceDashboardData | null;
   selectedMonth: number;
   selectedYear: number;
@@ -47,12 +48,25 @@ interface AttendanceDashboardProps {
 
 export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
   students,
+  userRole = 'ADMIN',
   dashboardData,
   selectedMonth,
   selectedYear,
   onMonthChange,
   onRefresh,
 }) => {
+  const isReadOnly = userRole === 'RECEPCAO';
+
+  // Separate Recepção users from Capoeira students
+  const recepcaoUsers = useMemo(
+    () => students.filter((s) => s.role === 'RECEPCAO'),
+    [students]
+  );
+  const capoeiraStudents = useMemo(
+    () => students.filter((s) => s.role !== 'RECEPCAO'),
+    [students]
+  );
+
   const [activeSubTab, setActiveSubTab] = useState<'geral' | 'chamada_dia'>('geral');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAlertsOnly, setFilterAlertsOnly] = useState(false);
@@ -65,18 +79,21 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
   const [manualLoading, setManualLoading] = useState(false);
   const [manualError, setManualError] = useState('');
 
-  // Email Report Modal
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const [recipientEmail, setRecipientEmail] = useState('');
-  const [emailSubject, setEmailSubject] = useState('');
-  const [emailNotes, setEmailNotes] = useState('');
-  const [emailLoading, setEmailLoading] = useState(false);
-  const [emailSuccess, setEmailSuccess] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [generatedMailto, setGeneratedMailto] = useState('');
+  // WhatsApp Recepção & PDF Modal
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [reportScope, setReportScope] = useState<'dia' | 'mes'>('dia');
+  const [selectedRecepcaoIds, setSelectedRecepcaoIds] = useState<string[]>([]);
+  const [sentRecepcaoIds, setSentRecepcaoIds] = useState<string[]>([]);
+  const [extraWhatsAppPhone, setExtraWhatsAppPhone] = useState('');
+  const [customWhatsAppNotes, setCustomWhatsAppNotes] = useState('');
 
   // Attendance by Day date filter
   const [selectedDayDate, setSelectedDayDate] = useState(dashboardData?.todayDateStr || getLocalDateString());
+
+  // Pre-select all Recepção users when modal opens or recepcaoUsers changes
+  useEffect(() => {
+    setSelectedRecepcaoIds(recepcaoUsers.map((r) => r.id));
+  }, [recepcaoUsers]);
 
   // Date details popover
   const [viewingDatesStudent, setViewingDatesStudent] = useState<StudentAttendanceStats | null>(null);
@@ -143,6 +160,7 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
 
   // Toggle checkin on specific date directly
   const handleToggleCheckinForStudent = async (studentId: string, date: string, isCurrentlyPresent: boolean) => {
+    if (isReadOnly) return;
     try {
       if (isCurrentlyPresent) {
         const res = await fetch(`/api/checkin?user_id=${studentId}&date=${date}`, {
@@ -178,13 +196,208 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
     window.location.href = `/api/checkin/export?month=${selectedMonth}&year=${selectedYear}`;
   };
 
-  // Print PDF
-  const handlePrintPDF = () => {
-    window.print();
+  // Generate Printable / Saveable PDF for Day or Month
+  const handleGeneratePDF = (scope: 'dia' | 'mes' = activeSubTab === 'chamada_dia' ? 'dia' : 'mes') => {
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      window.print();
+      return;
+    }
+
+    const emittedAt = new Date().toLocaleString('pt-BR');
+
+    if (scope === 'dia') {
+      const presentSet = new Set<string>();
+      const checkinTimeMap = new Map<string, string>();
+      dashboardData?.todayCheckins?.forEach((c) => {
+        if (c.checkin_date === selectedDayDate) {
+          presentSet.add(c.user_id);
+          if (c.created_at) {
+            checkinTimeMap.set(
+              c.user_id,
+              new Date(c.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            );
+          }
+        }
+      });
+
+      const presentStudents = capoeiraStudents.filter((s) => presentSet.has(s.id));
+      const absentStudents = capoeiraStudents.filter((s) => !presentSet.has(s.id));
+      const formattedDay = formatDateShortBR(selectedDayDate) || selectedDayDate;
+
+      const rowsHtml = capoeiraStudents
+        .map((st, idx) => {
+          const isPresent = presentSet.has(st.id);
+          const timeStr = checkinTimeMap.get(st.id) || '-';
+          return `
+            <tr style="background:${isPresent ? '#f0fdf4' : '#ffffff'};">
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;">${idx + 1}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5be;font-weight:bold;">${st.name}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;">"${st.nickname}"</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;">${st.corda}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;">${st.phone}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;color:${isPresent ? '#15803d' : '#b91c1c'};">
+                ${isPresent ? 'PRESENTE' : 'AUSENTE'}
+              </td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;">${timeStr}</td>
+            </tr>
+          `;
+        })
+        .join('');
+
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Chamada_ABADA_${selectedDayDate}</title>
+          <style>
+            body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 24px; }
+            .header { border-bottom: 3px solid #059669; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+            .title { font-size: 20px; font-weight: 900; color: #065f46; margin: 0; }
+            .subtitle { font-size: 13px; color: #475569; margin: 4px 0 0 0; }
+            .summary { display: flex; gap: 16px; margin-bottom: 18px; }
+            .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 16px; background: #f8fafc; }
+            .box-label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: bold; }
+            .box-val { font-size: 18px; font-weight: 900; margin-top: 2px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { background: #0f172a; color: #ffffff; padding: 9px 10px; border: 1px solid #0f172a; text-align: left; text-transform: uppercase; font-size: 11px; }
+            .footer { margin-top: 20px; font-size: 11px; color: #64748b; text-align: right; }
+            @media print { .no-print { display: none !important; } body { margin: 10px; } }
+          </style>
+        </head>
+        <body>
+          <div class="no-print" style="margin-bottom:16px;padding:12px;background:#ecfdf5;border:1px solid #10b981;border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:13px;font-weight:bold;color:#065f46;">Para salvar como arquivo PDF, escolha "Salvar como PDF" na janela de impressão.</span>
+            <button onclick="window.print()" style="padding:8px 16px;background:#059669;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">Imprimir / Salvar PDF</button>
+          </div>
+          <div class="header">
+            <div>
+              <h1 class="title">ABADÁ CAPOEIRA — LISTA DE CHAMADA DO DIA</h1>
+              <p class="subtitle">Data do Treino: <strong>${formattedDay} (${selectedDayDate.split('-').reverse().join('/')})</strong></p>
+            </div>
+            <div style="text-align:right;font-size:11px;color:#475569;">
+              Emitido em:<br/><strong>${emittedAt}</strong>
+            </div>
+          </div>
+          <div class="summary">
+            <div class="box"><div class="box-label">Total de Alunos</div><div class="box-val">${capoeiraStudents.length}</div></div>
+            <div class="box"><div class="box-label">Presentes Hoje</div><div class="box-val" style="color:#15803d;">${presentStudents.length}</div></div>
+            <div class="box"><div class="box-label">Ausentes</div><div class="box-val" style="color:#b91c1c;">${absentStudents.length}</div></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:36px;text-align:center;">#</th>
+                <th>Nome Completo</th>
+                <th>Apelido</th>
+                <th>Corda</th>
+                <th>Telefone</th>
+                <th style="text-align:center;">Status</th>
+                <th style="text-align:center;">Horário</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <div class="footer">Sistema Oficial ABADÁ Capoeira — Controle de Portaria & Recepção</div>
+          <script>setTimeout(() => { window.print(); }, 400);</script>
+        </body>
+        </html>
+      `);
+      printWin.document.close();
+      return;
+    }
+
+    // Scope === 'mes' (Relatório Mensal Completo)
+    const statsList = dashboardData?.studentsStats || [];
+    const rowsHtml = statsList
+      .map((st, idx) => {
+        return `
+          <tr style="background:${st.alertaFaltas ? '#fef2f2' : '#ffffff'};">
+            <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;">${idx + 1}</td>
+            <td style="padding:8px 10px;border:1px solid #cbd5e1;font-weight:bold;">${st.user.name}</td>
+            <td style="padding:8px 10px;border:1px solid #cbd5e1;">"${st.user.nickname}"</td>
+            <td style="padding:8px 10px;border:1px solid #cbd5e1;">${st.user.corda}</td>
+            <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;color:#15803d;">${st.presencasMes}</td>
+            <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;color:${st.alertaFaltas ? '#b91c1c' : '#334155'};">${st.faltasMes}</td>
+            <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;">${st.frequenciaPct}%</td>
+            <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;">${st.presencasAno}</td>
+            <td style="padding:8px 10px;border:1px solid #cbd5e1;font-weight:bold;color:${st.alertaFaltas ? '#b91c1c' : '#15803d'};">
+              ${st.alertaFaltas ? 'ALERTA (>3 faltas)' : 'Regular'}
+            </td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Frequencia_ABADA_${monthName}_${selectedYear}</title>
+        <style>
+          body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 24px; }
+          .header { border-bottom: 3px solid #059669; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+          .title { font-size: 20px; font-weight: 900; color: #065f46; margin: 0; }
+          .subtitle { font-size: 13px; color: #475569; margin: 4px 0 0 0; }
+          .summary { display: flex; gap: 16px; margin-bottom: 18px; }
+          .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 16px; background: #f8fafc; }
+          .box-label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: bold; }
+          .box-val { font-size: 18px; font-weight: 900; margin-top: 2px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th { background: #0f172a; color: #ffffff; padding: 9px 10px; border: 1px solid #0f172a; text-align: left; text-transform: uppercase; font-size: 11px; }
+          .footer { margin-top: 20px; font-size: 11px; color: #64748b; text-align: right; }
+          @media print { .no-print { display: none !important; } body { margin: 10px; } }
+        </style>
+      </head>
+      <body>
+        <div class="no-print" style="margin-bottom:16px;padding:12px;background:#ecfdf5;border:1px solid #10b981;border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:13px;font-weight:bold;color:#065f46;">Para salvar como arquivo PDF, escolha "Salvar como PDF" na janela de impressão.</span>
+          <button onclick="window.print()" style="padding:8px 16px;background:#059669;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">Imprimir / Salvar PDF</button>
+        </div>
+        <div class="header">
+          <div>
+            <h1 class="title">ABADÁ CAPOEIRA — RELATÓRIO MENSAL DE FREQUÊNCIA</h1>
+            <p class="subtitle">Mês de Referência: <strong>${monthName} de ${selectedYear}</strong></p>
+          </div>
+          <div style="text-align:right;font-size:11px;color:#475569;">
+            Emitido em:<br/><strong>${emittedAt}</strong>
+          </div>
+        </div>
+        <div class="summary">
+          <div class="box"><div class="box-label">Aulas Realizadas / Previstas</div><div class="box-val">${dashboardData?.totalAulasOcorridas || 0} / ${dashboardData?.totalAulasMes || 0}</div></div>
+          <div class="box"><div class="box-label">Total de Presenças</div><div class="box-val" style="color:#15803d;">${dashboardData?.totalCheckinsMes || 0}</div></div>
+          <div class="box"><div class="box-label">Média / Aula</div><div class="box-val">${dashboardData?.mediaAlunosPorAula || 0}</div></div>
+          <div class="box"><div class="box-label">Alunos em Alerta (&gt;3 faltas)</div><div class="box-val" style="color:#b91c1c;">${dashboardData?.alunosEmAlertaCount || 0}</div></div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px;text-align:center;">#</th>
+              <th>Nome Completo</th>
+              <th>Apelido</th>
+              <th>Corda</th>
+              <th style="text-align:center;">Presenças</th>
+              <th style="text-align:center;">Faltas</th>
+              <th style="text-align:center;">% Freq.</th>
+              <th style="text-align:center;">Ano</th>
+              <th>Situação</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        <div class="footer">Sistema Oficial ABADÁ Capoeira — Controle de Portaria & Recepção</div>
+        <script>setTimeout(() => { window.print(); }, 400);</script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
   };
 
   // Reset Month Check-ins
   const handleResetMonthCheckins = async () => {
+    if (isReadOnly) return;
     if (!confirm(`Tem certeza que deseja ZERAR todas as presenças e faltas de ${monthName}/${selectedYear}?`)) {
       return;
     }
@@ -202,49 +415,98 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
     }
   };
 
-  // Send Email preparation
-  const handlePrepareEmail = () => {
-    setEmailSubject(`Relatório de Frequência ABADÁ Capoeira - ${monthName}/${selectedYear}`);
-    setEmailSuccess('');
-    setEmailError('');
-    setGeneratedMailto('');
-    setIsEmailModalOpen(true);
+  // Open WhatsApp Recepção Modal
+  const handleOpenWhatsAppModal = () => {
+    setReportScope(activeSubTab === 'chamada_dia' ? 'dia' : 'mes');
+    setSentRecepcaoIds([]);
+    setIsWhatsAppModalOpen(true);
   };
 
-  const handleSendEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!recipientEmail) {
-      setEmailError('Informe um e-mail válido.');
-      return;
-    }
+  const toggleRecepcaoSelection = (id: string) => {
+    setSelectedRecepcaoIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
-    try {
-      setEmailLoading(true);
-      setEmailError('');
-      const res = await fetch('/api/checkin/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipientEmail,
-          month: selectedMonth,
-          year: selectedYear,
-          subject: emailSubject,
-          customNotes: emailNotes,
-        }),
+  // Build formatted WhatsApp text for Day or Month
+  const buildWhatsAppReportText = (recipientName?: string) => {
+    const greeting = recipientName ? `Olá *${recipientName}* (Recepção)!` : `Olá Equipe de Recepção!`;
+
+    if (reportScope === 'dia') {
+      const presentSet = new Set<string>();
+      dashboardData?.todayCheckins?.forEach((c) => {
+        if (c.checkin_date === selectedDayDate) {
+          presentSet.add(c.user_id);
+        }
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao enviar relatório.');
+      const presentStudents = capoeiraStudents.filter((s) => presentSet.has(s.id));
+      const absentStudents = capoeiraStudents.filter((s) => !presentSet.has(s.id));
+      const dateBR = selectedDayDate.split('-').reverse().join('/');
+
+      let msg = `🥋 *CHAMADA DO DIA - ABADÁ CAPOEIRA*\n`;
+      msg += `${greeting}\n`;
+      msg += `📅 *Data da Aula:* ${dateBR} (${formatDateShortBR(selectedDayDate)})\n`;
+      msg += `✅ *Presentes:* ${presentStudents.length} | ❌ *Ausentes:* ${absentStudents.length}\n\n`;
+
+      if (customWhatsAppNotes.trim()) {
+        msg += `📌 *Obs:* ${customWhatsAppNotes.trim()}\n\n`;
       }
 
-      setEmailSuccess(data.message);
-      setGeneratedMailto(data.mailtoLink);
-    } catch (err: any) {
-      setEmailError(err.message || 'Erro ao preparar envio do relatório.');
-    } finally {
-      setEmailLoading(false);
+      msg += `*LISTA DE PRESENTES (${presentStudents.length}):*\n`;
+      if (presentStudents.length === 0) {
+        msg += `_Nenhuma presença registrada nesta data._\n`;
+      } else {
+        presentStudents.forEach((s, idx) => {
+          msg += `${idx + 1}. *${s.name}* ("${s.nickname}") - Corda ${s.corda}\n`;
+        });
+      }
+
+      if (absentStudents.length > 0) {
+        msg += `\n*AUSENTES (${absentStudents.length}):*\n`;
+        absentStudents.forEach((s) => {
+          msg += `• ${s.name} ("${s.nickname}")\n`;
+        });
+      }
+
+      msg += `\n📄 _Você também pode visualizar/imprimir o PDF pelo painel da Recepção no App._`;
+      return msg;
     }
+
+    // Monthly Report
+    const statsList = dashboardData?.studentsStats || [];
+    let msg = `🥋 *RELATÓRIO MENSAL DE FREQUÊNCIA - ABADÁ CAPOEIRA*\n`;
+    msg += `${greeting}\n`;
+    msg += `📅 *Mês:* ${monthName} de ${selectedYear}\n`;
+    msg += `📊 *Aulas Realizadas:* ${dashboardData?.totalAulasOcorridas || 0} de ${dashboardData?.totalAulasMes || 0}\n`;
+    msg += `✅ *Total de Presenças:* ${dashboardData?.totalCheckinsMes || 0}\n\n`;
+
+    if (customWhatsAppNotes.trim()) {
+      msg += `📌 *Obs:* ${customWhatsAppNotes.trim()}\n\n`;
+    }
+
+    msg += `*RESUMO POR ALUNO:*\n`;
+    statsList.forEach((st, idx) => {
+      const alertFlag = st.alertaFaltas ? ' ⚠️' : '';
+      msg += `${idx + 1}. *${st.user.name}* ("${st.user.nickname}"): ${st.presencasMes} pres. | ${st.faltasMes} faltas (${st.frequenciaPct}%)${alertFlag}\n`;
+    });
+
+    msg += `\n📄 _Relatório completo em PDF e Excel disponível no painel da Recepção._`;
+    return msg;
+  };
+
+  const handleSendWhatsAppToPhone = (phone: string, name?: string, recepcaoId?: string) => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length < 8) {
+      alert('Número de WhatsApp inválido.');
+      return;
+    }
+    const finalPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    const text = encodeURIComponent(buildWhatsAppReportText(name));
+    if (recepcaoId) {
+      setSentRecepcaoIds((prev) => (prev.includes(recepcaoId) ? prev : [...prev, recepcaoId]));
+    }
+    window.open(`https://wa.me/${finalPhone}?text=${text}`, '_blank');
   };
 
   // Filter students
@@ -351,26 +613,33 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
             </div>
           </div>
 
-          {/* Quick Manual Check-in & Reset Month Buttons */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            {(dashboardData?.totalCheckinsMes || 0) > 0 && (
+          {/* Quick Manual Check-in & Reset Month Buttons (Staff Only - Hidden for Recepção) */}
+          {!isReadOnly ? (
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {(dashboardData?.totalCheckinsMes || 0) > 0 && (
+                <button
+                  onClick={handleResetMonthCheckins}
+                  className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-2xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-extrabold text-xs transition-all shrink-0"
+                  title="Zerar todas as presenças e faltas deste mês"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Zerar Mês</span>
+                </button>
+              )}
               <button
-                onClick={handleResetMonthCheckins}
-                className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-2xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-extrabold text-xs transition-all shrink-0"
-                title="Zerar todas as presenças e faltas deste mês"
+                onClick={() => setIsManualModalOpen(true)}
+                className="flex-1 sm:flex-initial flex items-center justify-center space-x-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30 transition-all shrink-0"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Zerar Mês</span>
+                <Plus className="w-4 h-4" />
+                <span>+ Presença Manual</span>
               </button>
-            )}
-            <button
-              onClick={() => setIsManualModalOpen(true)}
-              className="flex-1 sm:flex-initial flex items-center justify-center space-x-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30 transition-all shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Presença Manual</span>
-            </button>
-          </div>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-1.5 px-3.5 py-2 rounded-2xl bg-sky-500/10 border border-sky-500/30 text-sky-300 text-xs font-extrabold shrink-0">
+              <Eye className="w-4 h-4 text-sky-400 shrink-0" />
+              <span>Modo Recepção (Somente Leitura & Impressão)</span>
+            </div>
+          )}
 
         </div>
 
@@ -547,7 +816,7 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
           />
         </div>
 
-        {/* Export & Email Buttons - 3 Equal Columns on Mobile */}
+        {/* Export, PDF & WhatsApp Recepção Buttons - 3 Equal Columns on Mobile */}
         <div className="grid grid-cols-3 gap-2 w-full md:w-auto md:flex md:items-center">
           <button
             onClick={handleExportCSV}
@@ -559,21 +828,21 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
           </button>
 
           <button
-            onClick={handlePrintPDF}
+            onClick={() => handleGeneratePDF(activeSubTab === 'chamada_dia' ? 'dia' : 'mes')}
             className="flex items-center justify-center space-x-1 py-2 px-2.5 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/40 text-sky-300 text-xs font-bold transition-all shadow-sm"
-            title="Imprimir ou Salvar em PDF"
+            title="Imprimir ou Salvar em PDF (Dia ou Mês)"
           >
             <Printer className="w-4 h-4 text-sky-400 shrink-0" />
-            <span className="truncate">PDF</span>
+            <span className="truncate">PDF / Imprimir</span>
           </button>
 
           <button
-            onClick={handlePrepareEmail}
-            className="flex items-center justify-center space-x-1 py-2 px-2.5 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/40 text-amber-300 text-xs font-bold transition-all shadow-sm"
-            title="Enviar relatório por e-mail"
+            onClick={handleOpenWhatsAppModal}
+            className="flex items-center justify-center space-x-1 py-2 px-2.5 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-extrabold transition-all shadow-sm"
+            title="Enviar chamada e PDF para o WhatsApp da Recepção"
           >
-            <Mail className="w-4 h-4 text-amber-400 shrink-0" />
-            <span className="truncate">E-mail</span>
+            <MessageCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="truncate">WhatsApp Recepção</span>
           </button>
         </div>
 
@@ -697,7 +966,7 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
                     )}
 
                     {/* Card Actions */}
-                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-900">
+                    <div className={`grid ${isReadOnly ? 'grid-cols-1' : 'grid-cols-2'} gap-2 pt-1 border-t border-slate-900`}>
                       <button
                         onClick={() => setViewingDatesStudent(st)}
                         className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold text-center border border-slate-800 transition-all"
@@ -705,16 +974,18 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
                         Ver Datas ({st.datasComparecidas.length})
                       </button>
 
-                      <button
-                        onClick={() => {
-                          setManualStudentId(st.user.id);
-                          setIsManualModalOpen(true);
-                        }}
-                        className="py-2 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-xs font-bold text-center border border-emerald-500/30 transition-all flex items-center justify-center space-x-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ Presença</span>
-                      </button>
+                      {!isReadOnly && (
+                        <button
+                          onClick={() => {
+                            setManualStudentId(st.user.id);
+                            setIsManualModalOpen(true);
+                          }}
+                          className="py-2 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-xs font-bold text-center border border-emerald-500/30 transition-all flex items-center justify-center space-x-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Presença</span>
+                        </button>
+                      )}
                     </div>
 
                   </div>
@@ -861,16 +1132,18 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
                               Ver Datas ({st.datasComparecidas.length})
                             </button>
 
-                            <button
-                              onClick={() => {
-                                setManualStudentId(st.user.id);
-                                setIsManualModalOpen(true);
-                              }}
-                              className="p-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all"
-                              title="Adicionar presença manual para este aluno"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
+                            {!isReadOnly && (
+                              <button
+                                onClick={() => {
+                                  setManualStudentId(st.user.id);
+                                  setIsManualModalOpen(true);
+                                }}
+                                className="p-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all"
+                                title="Adicionar presença manual para este aluno"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
 
@@ -896,32 +1169,41 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
                 Chamada Rápida da Aula
               </h3>
               <p className="text-xs text-slate-400">
-                Toque no aluno para marcar ou desmarcar presença na hora
+                {isReadOnly
+                  ? 'Visualização da lista de presença do dia (somente leitura para Recepção)'
+                  : 'Toque no aluno para marcar ou desmarcar presença na hora'}
               </p>
             </div>
 
-            <div className="flex items-center space-x-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <span className="text-xs font-bold text-slate-400 shrink-0">Data:</span>
               <input
                 type="date"
                 value={selectedDayDate}
                 onChange={(e) => setSelectedDayDate(e.target.value)}
-                className="w-full sm:w-auto px-3 py-1.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
+                className="flex-1 sm:flex-initial px-3 py-1.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
               />
+              <button
+                onClick={() => handleGeneratePDF('dia')}
+                className="px-3 py-1.5 rounded-2xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 text-xs font-bold flex items-center space-x-1 shrink-0"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>PDF do Dia</span>
+              </button>
             </div>
           </div>
 
           {/* Quick Roll Call Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
-            {students.map((st) => {
+            {capoeiraStudents.map((st) => {
               const isPresent = dayCheckinUserIds.has(st.id);
               const cordInfo = getCordInfo(st.corda);
 
               return (
                 <div
                   key={st.id}
-                  onClick={() => handleToggleCheckinForStudent(st.id, selectedDayDate, isPresent)}
-                  className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between select-none ${
+                  onClick={() => !isReadOnly && handleToggleCheckinForStudent(st.id, selectedDayDate, isPresent)}
+                  className={`p-3 rounded-2xl border transition-all ${isReadOnly ? 'cursor-default' : 'cursor-pointer'} flex items-center justify-between select-none ${
                     isPresent
                       ? 'bg-emerald-950/40 border-emerald-500/60 shadow-lg shadow-emerald-500/10'
                       : 'bg-slate-950/60 hover:bg-slate-900 border-slate-800 text-slate-400'
@@ -999,7 +1281,7 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
                   className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
                 >
                   <option value="">Selecione um integrante...</option>
-                  {students.map((st) => (
+                  {capoeiraStudents.map((st) => (
                     <option key={st.id} value={st.id}>
                       {st.name} (&quot;{st.nickname}&quot;) - Corda: {st.corda}
                     </option>
@@ -1057,114 +1339,240 @@ export const AttendanceDashboard: React.FC<AttendanceDashboardProps> = ({
         </div>
       )}
 
-      {/* Modal: Send Email Report */}
-      {isEmailModalOpen && (
+      {/* Modal: Send Attendance Report & PDF to Recepção WhatsApp */}
+      {isWhatsAppModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="relative w-full max-w-lg bg-slate-900 border border-amber-500/40 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="relative w-full max-w-lg max-h-[90vh] bg-slate-900 border border-emerald-500/40 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
             
-            <div className="flex items-center justify-between px-5 py-4 bg-slate-950 border-b border-slate-800">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 bg-slate-950 border-b border-slate-800 shrink-0">
               <div className="flex items-center space-x-2.5">
-                <div className="p-2 bg-amber-500/10 text-amber-400 rounded-xl">
-                  <Mail className="w-5 h-5" />
+                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/30">
+                  <MessageCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-white">Enviar Relatório por E-mail</h3>
+                  <h3 className="text-base font-extrabold text-white">Enviar Chamada para Recepção</h3>
                   <p className="text-xs text-slate-400">
-                    Frequência de {monthName}/{selectedYear}
+                    Gere o PDF e envie pelo WhatsApp para a equipe da Recepção
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setIsEmailModalOpen(false)}
+                onClick={() => setIsWhatsAppModalOpen(false)}
                 className="p-2 text-slate-400 hover:text-white rounded-xl"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSendEmail} className="p-5 space-y-4">
-              {emailSuccess && (
-                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold space-y-2">
-                  <p>{emailSuccess}</p>
-                  {generatedMailto && (
-                    <div className="pt-2 flex items-center space-x-2">
-                      <a
-                        href={generatedMailto}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Abrir no Seu E-mail (Gmail/Outlook)</span>
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {emailError && (
-                <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">
-                  {emailError}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
-                  E-mail de Destino *
+            {/* Body */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              
+              {/* Step 1: Choose Report Type (Day vs Month) */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-300 uppercase">
+                  1. Qual lista você deseja enviar?
                 </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="exemplo@gmail.com ou secretaria@escola.com"
-                  value={recipientEmail}
-                  onChange={(e) => setRecipientEmail(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-amber-500"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setReportScope('dia')}
+                    className={`p-3 rounded-2xl border text-left transition-all ${
+                      reportScope === 'dia'
+                        ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-lg'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="text-xs font-extrabold block">Chamada do Dia</span>
+                    <span className="text-[10px] text-emerald-300 font-semibold">
+                      Data: {selectedDayDate.split('-').reverse().join('/')}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setReportScope('mes')}
+                    className={`p-3 rounded-2xl border text-left transition-all ${
+                      reportScope === 'mes'
+                        ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-lg'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="text-xs font-extrabold block">Relatório do Mês</span>
+                    <span className="text-[10px] text-amber-300 font-semibold">
+                      {monthName}/{selectedYear}
+                    </span>
+                  </button>
+                </div>
+
+                {reportScope === 'dia' && (
+                  <div className="flex items-center space-x-2 pt-1">
+                    <span className="text-xs text-slate-400">Alterar data da chamada:</span>
+                    <input
+                      type="date"
+                      value={selectedDayDate}
+                      onChange={(e) => setSelectedDayDate(e.target.value)}
+                      className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs"
+                    />
+                  </div>
+                )}
               </div>
 
+              {/* Step 2: Generate PDF File */}
+              <div className="p-3.5 rounded-2xl bg-sky-950/30 border border-sky-500/30 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-extrabold text-white flex items-center space-x-1.5">
+                    <FileText className="w-4 h-4 text-sky-400 shrink-0" />
+                    <span>2. Arquivo PDF Oficial ({reportScope === 'dia' ? 'Chamada do Dia' : 'Frequência do Mês'})</span>
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Gere ou salve o PDF para anexar na conversa do WhatsApp
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleGeneratePDF(reportScope)}
+                  className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs shrink-0 shadow-md transition-all"
+                >
+                  Baixar / Ver PDF
+                </button>
+              </div>
+
+              {/* Step 3: Select Recepção Members */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-300 uppercase">
+                    3. Selecionar Pessoas da Recepção ({selectedRecepcaoIds.length}/{recepcaoUsers.length})
+                  </label>
+                  {recepcaoUsers.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedRecepcaoIds(
+                          selectedRecepcaoIds.length === recepcaoUsers.length
+                            ? []
+                            : recepcaoUsers.map((r) => r.id)
+                        )
+                      }
+                      className="text-[11px] text-emerald-400 hover:underline font-bold"
+                    >
+                      {selectedRecepcaoIds.length === recepcaoUsers.length
+                        ? 'Desmarcar todos'
+                        : 'Selecionar todos'}
+                    </button>
+                  )}
+                </div>
+
+                {recepcaoUsers.length === 0 ? (
+                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-amber-500/30 text-xs text-amber-300 space-y-1">
+                    <p className="font-bold">Nenhuma pessoa cadastrada com a função &quot;RECEPÇÃO&quot; ainda.</p>
+                    <p className="text-[11px] text-slate-400">
+                      Vá na aba <strong>Alunos / Gestão</strong>, edite ou cadastre as pessoas da portaria/recepção e mude a Função delas para <strong>RECEPÇÃO</strong>. Elas aparecerão automaticamente aqui!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {recepcaoUsers.map((rec) => {
+                      const isSelected = selectedRecepcaoIds.includes(rec.id);
+                      const wasSent = sentRecepcaoIds.includes(rec.id);
+                      return (
+                        <div
+                          key={rec.id}
+                          className={`p-3 rounded-2xl border flex items-center justify-between gap-2 transition-all ${
+                            isSelected
+                              ? 'bg-slate-950 border-emerald-500/40'
+                              : 'bg-slate-950/40 border-slate-800 opacity-60'
+                          }`}
+                        >
+                          <label className="flex items-center space-x-3 cursor-pointer min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleRecepcaoSelection(rec.id)}
+                              className="w-4 h-4 rounded accent-emerald-500"
+                            />
+                            <div className="min-w-0">
+                              <span className="text-xs font-extrabold text-white block truncate">
+                                {rec.name} (&quot;{rec.nickname}&quot;)
+                              </span>
+                              <span className="text-[11px] font-mono text-emerald-400 block">
+                                WhatsApp: {rec.phone}
+                              </span>
+                            </div>
+                          </label>
+
+                          {isSelected && (
+                            <button
+                              type="button"
+                              onClick={() => handleSendWhatsAppToPhone(rec.phone, rec.name, rec.id)}
+                              className={`px-3 py-1.5 rounded-xl font-extrabold text-xs flex items-center space-x-1.5 shrink-0 transition-all ${
+                                wasSent
+                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
+                                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md'
+                              }`}
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              <span>{wasSent ? 'Enviado ✓ (Reenviar)' : 'Enviar WhatsApp'}</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Optional Custom Notes */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
-                  Assunto da Mensagem
+                  Observação na Mensagem (Opcional)
                 </label>
                 <input
                   type="text"
-                  value={emailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-amber-500"
+                  placeholder="Ex: Liberar entrada dos alunos listados acima..."
+                  value={customWhatsAppNotes}
+                  onChange={(e) => setCustomWhatsAppNotes(e.target.value)}
+                  className="w-full px-4 py-2 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
-                  Mensagem Adicional / Observações
+              {/* Optional Extra Phone Input */}
+              <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-400 uppercase">
+                  Ou enviar para outro número de WhatsApp avulso:
                 </label>
-                <textarea
-                  rows={3}
-                  placeholder="Ex: Segue a relação de frequência do mês..."
-                  value={emailNotes}
-                  onChange={(e) => setEmailNotes(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-amber-500 resize-none"
-                />
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    placeholder="DDD + Número (ex: 41999999999)"
+                    value={extraWhatsAppPhone}
+                    onChange={(e) => setExtraWhatsAppPhone(e.target.value)}
+                    className="flex-1 px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs font-mono"
+                  />
+                  <button
+                    type="button"
+                    disabled={!extraWhatsAppPhone.trim()}
+                    onClick={() => handleSendWhatsAppToPhone(extraWhatsAppPhone, 'Recepção')}
+                    className="px-4 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-extrabold text-xs shrink-0 flex items-center space-x-1"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Enviar</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
-                <button
-                  type="button"
-                  onClick={() => setIsEmailModalOpen(false)}
-                  className="px-4 py-2 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs"
-                >
-                  Fechar
-                </button>
+            </div>
 
-                <button
-                  type="submit"
-                  disabled={emailLoading}
-                  className="px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 disabled:opacity-50"
-                >
-                  {emailLoading ? 'Preparando...' : 'Gerar e Enviar'}
-                </button>
-              </div>
-            </form>
+            {/* Footer */}
+            <div className="px-5 py-3.5 bg-slate-950 border-t border-slate-800 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsWhatsAppModalOpen(false)}
+                className="px-5 py-2 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs"
+              >
+                Concluído
+              </button>
+            </div>
 
           </div>
         </div>

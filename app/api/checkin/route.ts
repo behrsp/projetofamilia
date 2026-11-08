@@ -25,9 +25,10 @@ export async function GET(req: Request) {
     const todayIsClass = isClassDay(now);
 
     const isStaff = session.role === 'ADMIN' || session.role === 'PROFESSOR';
+    const canViewDashboard = isStaff || session.role === 'RECEPCAO';
 
     // Student self-view
-    if (!isStaff) {
+    if (!canViewDashboard) {
       const todayCheckinRes = await pool.query(
         'SELECT id, user_id, checkin_date::text, created_at, notes FROM checkins WHERE user_id = $1 AND checkin_date = $2',
         [session.id, todayDateStr]
@@ -63,9 +64,9 @@ export async function GET(req: Request) {
     const targetYear = parseInt(searchParams.get('year') || String(now.getFullYear()), 10);
     const targetDate = searchParams.get('date') || todayDateStr;
 
-    // 1. Fetch all students
+    // 1. Fetch all students (excluding RECEPCAO from training attendance list)
     const studentsRes = await pool.query(
-      'SELECT id, name, nickname, phone, birthdate, corda, role, avatar_url, created_at FROM users ORDER BY name ASC'
+      "SELECT id, name, nickname, phone, birthdate, corda, role, avatar_url, created_at FROM users WHERE role != 'RECEPCAO' ORDER BY name ASC"
     );
     const students: User[] = studentsRes.rows;
 
@@ -156,6 +157,11 @@ export async function GET(req: Request) {
       ? Math.round((totalCheckinsMes / totalAulasOcorridas) * 10) / 10 
       : 0;
 
+    // Combine month checkins and specific targetDate checkins so any selected day in the UI has full checkin details
+    const combinedCheckinsMap = new Map<string, any>();
+    monthCheckinsRes.rows.forEach((r) => combinedCheckinsMap.set(r.id, r));
+    dateCheckinsRes.rows.forEach((r) => combinedCheckinsMap.set(r.id, r));
+
     const dashboard: AttendanceDashboardData = {
       month: targetMonth,
       year: targetYear,
@@ -167,13 +173,14 @@ export async function GET(req: Request) {
       totalCheckinsMes,
       mediaAlunosPorAula,
       alunosEmAlertaCount,
-      todayCheckins: dateCheckinsRes.rows,
+      todayCheckins: Array.from(combinedCheckinsMap.values()),
       isTodayClassDay: todayIsClass,
       todayDateStr,
     };
 
     return NextResponse.json({
       isStaff: true,
+      canEdit: isStaff,
       dashboard,
     });
   } catch (error: any) {
@@ -192,6 +199,11 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const isStaff = session.role === 'ADMIN' || session.role === 'PROFESSOR';
+    if (session.role === 'RECEPCAO') {
+      return NextResponse.json({ 
+        error: 'A Recepção possui permissão apenas para visualizar, imprimir e exportar as chamadas.' 
+      }, { status: 403 });
+    }
     const now = new Date();
     const todayDateStr = getLocalDateString(now);
 

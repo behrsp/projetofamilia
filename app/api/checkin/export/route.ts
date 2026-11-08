@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   try {
     await initDb();
     const session = await getAuthSession();
-    if (!session || (session.role !== 'ADMIN' && session.role !== 'PROFESSOR')) {
+    if (!session || (session.role !== 'ADMIN' && session.role !== 'PROFESSOR' && session.role !== 'RECEPCAO')) {
       return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 });
     }
 
@@ -22,9 +22,9 @@ export async function GET(req: Request) {
     const targetYear = parseInt(searchParams.get('year') || String(now.getFullYear()), 10);
     const monthName = MONTH_NAMES[targetMonth - 1] || `Mês ${targetMonth}`;
 
-    // 1. Fetch students
+    // 1. Fetch students (excluding RECEPCAO from capoeira attendance report)
     const studentsRes = await pool.query(
-      'SELECT id, name, nickname, phone, corda, role FROM users ORDER BY name ASC'
+      "SELECT id, name, nickname, phone, corda, role FROM users WHERE role != 'RECEPCAO' ORDER BY name ASC"
     );
     const students: User[] = studentsRes.rows;
 

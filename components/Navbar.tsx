@@ -43,6 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const isStaff = user?.role === 'ADMIN' || user?.role === 'PROFESSOR';
+  const canViewPresenca = isStaff || user?.role === 'RECEPCAO';
 
   // Desktop All Tabs
   const navItems = [
@@ -56,8 +57,10 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'mensageiro', label: 'Mensageiro', mobileLabel: 'Chat', icon: MessageSquare, badge: unreadCount },
   ];
 
-  if (isStaff) {
+  if (canViewPresenca) {
     navItems.push({ id: 'presenca', label: 'Chamada & Frequência', mobileLabel: 'Chamada', icon: ClipboardCheck });
+  }
+  if (isStaff) {
     navItems.push({ id: 'dashboard', label: 'Alunos / Gestão', mobileLabel: 'Gestão', icon: Users });
   }
 
@@ -71,8 +74,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   // Secondary tabs inside the "Mais" Mobile Drawer
   const secondaryMobileTabs = [
+    ...(canViewPresenca ? [
+      { id: 'presenca', label: 'Chamada & Frequência', desc: 'Presenças, faltas, PDF e Excel', icon: ClipboardCheck, isStaffOnly: true },
+    ] : []),
     ...(isStaff ? [
-      { id: 'presenca', label: 'Chamada & Frequência', desc: 'Presenças, faltas e relatórios', icon: ClipboardCheck, isStaffOnly: true },
       { id: 'dashboard', label: 'Gestão de Alunos', desc: 'Cadastros, cordas e senhas', icon: Users, isStaffOnly: true },
     ] : []),
     { id: 'fotos', label: 'Fotos & Galeria', desc: 'Mural de fotos dos treinos', icon: Camera },

@@ -224,7 +224,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <ShieldAlert className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Professores / Admin</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Equipe / Recepção</p>
             <h3 className="text-2xl font-extrabold text-white mt-0.5">
               {students.filter((s) => s.role !== 'ALUNO').length}
             </h3>
@@ -355,10 +355,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                           : st.role === 'PROFESSOR'
                           ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : st.role === 'RECEPCAO'
+                          ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
                           : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                       }`}
                     >
-                      {st.role}
+                      {st.role === 'RECEPCAO' ? 'RECEPÇÃO' : st.role}
                     </span>
 
                     {isToday && (
@@ -494,10 +496,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                               : st.role === 'PROFESSOR'
                               ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : st.role === 'RECEPCAO'
+                              ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
                               : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           }`}
                         >
-                          {st.role}
+                          {st.role === 'RECEPCAO' ? 'RECEPÇÃO' : st.role}
                         </span>
                       </td>
 
@@ -641,9 +645,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onChange={(e) => setNewRole(e.target.value as UserRole)}
                   className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
                 >
-                  <option value="ALUNO">ALUNO</option>
-                  <option value="PROFESSOR">PROFESSOR</option>
-                  <option value="ADMIN">ADMINISTRADOR</option>
+                  <option value="ALUNO">ALUNO (Acesso comum)</option>
+                  <option value="RECEPCAO">RECEPÇÃO (Visualiza chamadas, imprime, PDF e Excel)</option>
+                  <option value="PROFESSOR">PROFESSOR (Gestão de alunos e chamadas)</option>
+                  <option value="ADMIN">ADMINISTRADOR (Acesso total)</option>
                 </select>
               </div>
 
@@ -850,6 +855,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="w-full px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-emerald-500"
                 >
                   <option value="ALUNO">ALUNO (Acesso comum)</option>
+                  <option value="RECEPCAO">RECEPÇÃO (Visualiza chamadas, imprime, PDF e Excel)</option>
                   <option value="PROFESSOR">PROFESSOR (Gestão de alunos e pedidos)</option>
                   <option value="ADMIN">ADMINISTRADOR (Acesso total)</option>
                 </select>

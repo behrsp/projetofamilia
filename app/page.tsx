@@ -352,6 +352,7 @@ export default function Home() {
   }
 
   const isStaff = user.role === 'ADMIN' || user.role === 'PROFESSOR';
+  const canViewPresenca = isStaff || user.role === 'RECEPCAO';
 
   // Calculate cord counts for modal
   const studentCordCounts: Record<string, number> = {};
@@ -377,8 +378,8 @@ export default function Home() {
       {/* Main Content Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-5 sm:space-y-6">
         
-        {/* Student Check-in Card (Visible to students) */}
-        {!isStaff && (
+        {/* Student Check-in Card (Visible only to regular students) */}
+        {!canViewPresenca && (
           <StudentCheckinCard
             user={user}
             isCheckedInToday={studentCheckinState.isCheckedInToday}
@@ -429,10 +430,11 @@ export default function Home() {
           </div>
         )}
 
-        {/* Tab: Presença & Frequência (Staff only - Admins e Professores) */}
-        {activeTab === 'presenca' && isStaff && (
+        {/* Tab: Presença & Frequência (Admins, Professores e Recepção) */}
+        {activeTab === 'presenca' && canViewPresenca && (
           <AttendanceDashboard
             students={students}
+            userRole={user.role}
             dashboardData={attendanceDashboard}
             selectedMonth={attendanceMonth}
             selectedYear={attendanceYear}
